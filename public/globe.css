@@ -1,0 +1,301 @@
+/* The Global Dashboard, wearing the same Windows 98 clothes as the main window.
+ * style.css does the heavy lifting — bevels, title bar, buttons, status bar —
+ * and this only adds what the globe itself needs.
+ */
+
+.window-globe {
+  width: min(860px, 100%);
+  height: min(700px, 100%);
+}
+
+.globe-body {
+  flex-direction: row;
+  gap: 8px;
+}
+
+/* The globe sits in a sunken well, exactly as the television does — that is
+   what makes it read as part of the application rather than a page behind it. */
+.globe-well {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: #000308;
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark), inset -1px -1px 0 var(--face-light);
+  overflow: hidden;
+}
+
+#globe {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+#globe:active {
+  cursor: grabbing;
+}
+
+.globe-loading {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  color: #7fd4f5;
+  background: #000308;
+  pointer-events: none;
+  transition: opacity 0.3s steps(4, end);
+}
+
+.globe-loading.gone {
+  opacity: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   The readout panel
+   --------------------------------------------------------------------------- */
+
+.globe-side {
+  width: 258px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Search
+   --------------------------------------------------------------------------- */
+
+.search-row {
+  display: flex;
+  gap: 5px;
+  flex: none;
+}
+
+#search {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 5px;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--white);
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark), inset -1px -1px 0 var(--face-light);
+}
+
+#search:focus {
+  outline: none;
+}
+
+/* A dropdown of matches, styled as a Win98 list box. */
+.results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 132px;
+  overflow-y: auto;
+  background: var(--white);
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark), inset -1px -1px 0 var(--face-light);
+  flex: none;
+}
+
+.results li {
+  padding: 3px 6px;
+  cursor: pointer;
+}
+
+.results li:hover,
+.results li.active {
+  background: var(--title-a);
+  color: var(--white);
+}
+
+.results .where {
+  color: var(--shadow);
+}
+
+.results li:hover .where,
+.results li.active .where {
+  color: #c8d8f0;
+}
+
+/* Win98 grouped a related block of controls in a labelled etched box. */
+.fieldset {
+  position: relative;
+  padding: 12px 8px 8px;
+  border: 1px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  min-height: 0;
+}
+
+.fieldset-grow {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.fieldset-label {
+  position: absolute;
+  top: -7px;
+  left: 6px;
+  padding: 0 3px;
+  background: var(--face);
+  font-weight: bold;
+}
+
+.place {
+  margin: 0;
+  font-weight: bold;
+  line-height: 1.35;
+}
+
+.coords {
+  margin: 3px 0 0;
+  color: #404040;
+  font-family: "Consolas", "Lucida Console", monospace;
+}
+
+.readout {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.headlines {
+  margin: 0;
+  padding-left: 15px;
+  line-height: 1.45;
+}
+
+.headlines li {
+  margin-bottom: 6px;
+}
+
+.headlines .source {
+  color: #404040;
+}
+
+.localtime {
+  margin: 3px 0 0;
+  font-weight: bold;
+  color: #000080;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  cursor: pointer;
+  margin-bottom: 2px;
+}
+
+.check input {
+  margin: 0;
+}
+
+.check.disabled {
+  color: var(--shadow);
+  text-shadow: 1px 1px 0 var(--white);
+}
+
+/* ---------------------------------------------------------------------------
+   Recently visited
+   --------------------------------------------------------------------------- */
+
+.fieldset-recent {
+  flex: none;
+  max-height: 108px;
+  overflow-y: auto;
+}
+
+.recent {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent li {
+  padding: 1px 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent li:hover {
+  background: var(--title-a);
+  color: var(--white);
+}
+
+.recent .empty {
+  color: var(--shadow);
+  cursor: default;
+}
+
+.recent .empty:hover {
+  background: none;
+  color: var(--shadow);
+}
+
+/* ---------------------------------------------------------------------------
+   Markers drawn over the globe
+   --------------------------------------------------------------------------- */
+
+.plane {
+  width: 13px;
+  height: 13px;
+  color: #ffe08a;
+  /* The arrow points along the aircraft's heading; the wrapper is rotated. */
+  font-size: 13px;
+  line-height: 1;
+  pointer-events: none;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+  will-change: transform;
+}
+
+.globe-tip {
+  padding: 2px 6px;
+  background: var(--face);
+  border: 1px solid;
+  border-color: var(--white) var(--dark) var(--dark) var(--white);
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.title-icon-globe {
+  background: #0b3d5c;
+}
+
+.title-icon-globe::after {
+  /* Meridians, faintly, inside the little title-bar globe. */
+  background: none;
+  border: 1px solid #59c2e8;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(89, 194, 232, 0.35);
+}
+
+/* ---------------------------------------------------------------------------
+   Narrow windows: the readout drops under the globe rather than squeezing it
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  .globe-body {
+    flex-direction: column;
+  }
+  .globe-side {
+    width: auto;
+    max-height: 40%;
+  }
+  .globe-well {
+    min-height: 220px;
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "_comment": "An example channel. Delete this folder if you don't want it. Everything here is optional except name and fetch.url.",
+
+  "name": "Tides",
+  "description": "high and low water",
+  "aliases": ["tides", "tide table", "high tide", "low tide"],
+
+  "fetch": {
+    "_comment": "{lat} and {lon} are filled in from wherever you are. {city} works too.",
+    "url": "https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&current=sea_level_height_msl,wave_height&daily=wave_height_max&timezone=auto",
+    "pick": "current",
+    "everySeconds": 900
+  },
+
+  "_displayComment": "With no render.js beside this file, Greg draws the channel from here. Paths are looked up in whatever 'pick' selected.",
+  "display": {
+    "big": { "path": "sea_level_height_msl", "suffix": " m", "label": "sea level vs mean" },
+    "rows": [
+      { "label": "Wave height", "path": "wave_height", "suffix": " m" },
+      { "label": "Reading", "path": "time" }
+    ]
+  }
+}

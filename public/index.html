@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Greg</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M11 6l5 5 5-5' stroke='%23888' stroke-width='2' fill='none'/><rect x='3' y='10' width='26' height='19' rx='3' fill='%23c9c2af' stroke='%233a352b' stroke-width='1.5'/><rect x='6' y='13' width='17' height='13' fill='%23111'/><rect x='6' y='13' width='2.4' height='9' fill='%23c0c0c0'/><rect x='8.4' y='13' width='2.4' height='9' fill='%23c0c000'/><rect x='10.8' y='13' width='2.4' height='9' fill='%2300c0c0'/><rect x='13.2' y='13' width='2.4' height='9' fill='%2300c000'/><rect x='15.6' y='13' width='2.4' height='9' fill='%23c000c0'/><rect x='18' y='13' width='2.4' height='9' fill='%23c00000'/><rect x='20.4' y='13' width='2.6' height='9' fill='%230000c0'/><circle cx='26' cy='23' r='1.6' fill='%238a8474'/></svg>"
+    />
+  </head>
+  <body data-mode="off">
+    <!-- The desktop the window sits on. -->
+    <div class="desktop">
+      <div class="window" role="application" aria-label="Greg">
+        <div class="title-bar">
+          <span class="title-icon" aria-hidden="true"></span>
+          <span class="title-text">Greg</span>
+          <!-- Window furniture: decoration, not controls. Hidden from screen
+               readers and unclickable, so nothing promises what it can't do. -->
+          <span class="title-buttons" aria-hidden="true">
+            <span class="title-btn">&#95;</span>
+            <span class="title-btn">&#9633;</span>
+            <span class="title-btn title-btn-close">&#10005;</span>
+          </span>
+        </div>
+
+        <div class="window-body">
+          <div class="face-wrap">
+            <div class="screen-well">
+              <canvas id="face" aria-label="Greg's face"></canvas>
+            </div>
+            <div id="overlay" class="overlay">
+              <div class="dialog">
+                <div class="dialog-title">Greg</div>
+                <div class="dialog-body">
+                  <p class="overlay-note">Greg needs your microphone to hear you.</p>
+                  <button id="wake-btn" class="btn btn-default">Wake Greg</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p id="status" class="status">Tap to wake</p>
+
+          <div class="transcript">
+            <p id="you" class="you"></p>
+            <p id="greg" class="greg"></p>
+          </div>
+
+          <div class="controls">
+            <button id="mic-btn" class="btn icon-btn" title="Mute microphone">🎙</button>
+            <input id="input" type="text" placeholder="…or type to Greg" autocomplete="off" spellcheck="false" />
+            <button id="globe-btn" class="btn icon-btn" title="Open the Global Dashboard">🌐</button>
+            <button id="music-btn" class="btn icon-btn" title="Move to whatever is playing on your speakers">🎵</button>
+            <button id="channel-btn" class="btn icon-btn" title="Change the channel">📺</button>
+            <button id="volume-btn" class="btn icon-btn" title="Volume — click to turn him up, shift-click to turn him down">🔊</button>
+            <button id="eyes-btn" class="btn icon-btn" title="Close Greg's eyes (frees ~5.9 GB)">👁</button>
+            <button id="gaming-btn" class="btn icon-btn" title="Gaming mode — free up the graphics card">🎮</button>
+            <button id="settings-btn" class="btn icon-btn" title="Settings">⚙</button>
+            <button id="reset-btn" class="btn icon-btn" title="Start a new conversation">⟲</button>
+          </div>
+
+          <p id="hint" class="hint">Say “Hey Greg”, then ask for the weather or the local news.</p>
+        </div>
+
+        <div class="status-bar">
+          <span id="badge" class="status-panel badge">connecting…</span>
+          <span class="status-panel status-panel-grow"></span>
+        </div>
+
+        <!-- Settings. A properties dialog over the window, which is what Windows
+             would have done, and it keeps Greg in one place rather than splitting
+             him across two the way the globe does.
+
+             Only settings that take effect without restarting him are here; see
+             lib/settings.js for why. A control that silently does nothing until
+             you restart is worse than no control. -->
+        <div id="settings" class="overlay settings-overlay" hidden>
+          <div class="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+            <div class="dialog-title">
+              <span id="settings-title">Greg Properties</span>
+              <button id="settings-x" class="title-btn title-btn-close" title="Close" aria-label="Close">&#10005;</button>
+            </div>
+
+            <div class="tabs" role="tablist">
+              <button class="tab" role="tab" data-tab="general" aria-selected="true">General</button>
+              <button class="tab" role="tab" data-tab="location" aria-selected="false">Location</button>
+              <button class="tab" role="tab" data-tab="personality" aria-selected="false">Personality</button>
+              <button class="tab" role="tab" data-tab="listening" aria-selected="false">Listening</button>
+              <button class="tab" role="tab" data-tab="music" aria-selected="false">Music</button>
+            </div>
+
+            <div class="dialog-body tab-body">
+              <!-- General -->
+              <section class="tab-page" data-page="general">
+                <label class="field">
+                  <span>His name</span>
+                  <input id="set-name" type="text" maxlength="30" spellcheck="false" />
+                </label>
+                <p class="field-note">Changing this changes what he answers to. Add a matching wake word below.</p>
+
+                <label class="field">
+                  <span>Wake words</span>
+                  <textarea id="set-wake" rows="4" spellcheck="false"></textarea>
+                </label>
+                <p class="field-note">One per line. The extra spellings catch what speech recognition actually hears.</p>
+
+                <fieldset class="group">
+                  <legend>Desktop</legend>
+                  <span id="set-bg-swatches" class="swatches"></span>
+                  <label class="field inline">
+                    <span>Colour</span>
+                    <input id="set-bg" type="color" />
+                    <output id="set-bg-hex"></output>
+                  </label>
+                </fieldset>
+
+                <fieldset class="group">
+                  <legend>Sound</legend>
+                  <label class="field inline">
+                    <span>Volume</span>
+                    <input id="set-volume" type="range" min="0" max="100" step="5" />
+                    <output id="set-volume-out"></output>
+                  </label>
+                  <p class="field-note">The same dial as the left-hand knob on the set. Covers his voice and the announcement chime.</p>
+                  <label class="field inline">
+                    <span>Subtitles</span>
+                    <select id="set-subtitles">
+                      <option value="auto">When he's muted</option>
+                      <option value="always">Always</option>
+                      <option value="off">Never</option>
+                    </select>
+                  </label>
+                  <p class="field-note">Page 888. Turned right down he'd otherwise answer into silence — this puts what he said on the screen.</p>
+                </fieldset>
+
+                <fieldset class="group">
+                  <legend>Units</legend>
+                  <label class="radio"><input type="radio" name="temp" value="fahrenheit" /> Fahrenheit</label>
+                  <label class="radio"><input type="radio" name="temp" value="celsius" /> Celsius</label>
+                  <span class="group-gap"></span>
+                  <label class="radio"><input type="radio" name="wind" value="mph" /> mph</label>
+                  <label class="radio"><input type="radio" name="wind" value="kmh" /> km/h</label>
+                </fieldset>
+              </section>
+
+              <!-- Location -->
+              <section class="tab-page" data-page="location" hidden>
+                <label class="radio block">
+                  <input type="radio" name="loc" value="auto" /> Follow my IP address
+                </label>
+                <p class="field-note">
+                  Convenient, and often wrong: it follows your connection, not you. Your ISP's three
+                  geolocation services disagreed by several hundred miles.
+                </p>
+
+                <label class="radio block">
+                  <input type="radio" name="loc" value="fixed" /> Always use this place
+                </label>
+
+                <div class="search-row">
+                  <input id="set-place" type="text" placeholder="Town or city" spellcheck="false" />
+                  <button id="set-place-go" class="btn" type="button">Search</button>
+                </div>
+                <ul id="set-place-results" class="results" hidden></ul>
+                <p id="set-place-current" class="field-note"></p>
+              </section>
+
+              <!-- Personality -->
+              <section class="tab-page" data-page="personality" hidden>
+                <label class="field">
+                  <span>Character</span>
+                  <select id="set-persona"></select>
+                </label>
+                <p id="set-persona-note" class="field-note"></p>
+                <div id="set-dials"></div>
+                <label class="check">
+                  <input id="set-mirror" type="checkbox" /> Match my tone and length
+                </label>
+                <label class="check">
+                  <input id="set-vocoder" type="checkbox" /> Vocoder — put his voice through the television
+                </label>
+                <label class="field inline">
+                  <span>Effect</span>
+                  <input id="set-vocoder-amount" type="range" min="0" max="100" step="1" />
+                  <output id="set-vocoder-out"></output>
+                </label>
+                <label class="field">
+                  <span>Anything else</span>
+                  <textarea id="set-style" rows="2" maxlength="400" spellcheck="false"
+                            placeholder="e.g. call me boss, never apologise"></textarea>
+                </label>
+              </section>
+
+              <!-- Listening -->
+              <section class="tab-page" data-page="listening" hidden>
+                <label class="field">
+                  <span>Microphone</span>
+                  <select id="set-mic"></select>
+                </label>
+                <p id="set-mic-note" class="field-note"></p>
+
+                <hr class="rule" />
+
+                <label class="check">
+                  <input id="set-followup" type="checkbox" /> Keep listening after he answers
+                </label>
+                <label class="field inline">
+                  <span>for</span>
+                  <input id="set-followup-secs" type="number" min="2" max="30" step="1" />
+                  <span>seconds</span>
+                </label>
+
+                <label class="check">
+                  <input id="set-barge" type="checkbox" /> Let me interrupt him by talking
+                </label>
+                <label class="field inline">
+                  <span>after</span>
+                  <input id="set-barge-ms" type="number" min="200" max="3000" step="50" />
+                  <span>ms of speech</span>
+                </label>
+                <p class="field-note">Needs headphones — on speakers he hears his own voice and stops himself.</p>
+
+                <hr class="rule" />
+
+                <label class="field inline">
+                  <span>Mic trigger</span>
+                  <input id="set-minlevel" type="number" min="0.001" max="0.2" step="0.001" />
+                </label>
+                <label class="field inline">
+                  <span>Above room noise &times;</span>
+                  <input id="set-floor" type="number" min="1.2" max="12" step="0.1" />
+                </label>
+                <p class="field-note">
+                  Talk and watch the bar. If it never reaches the marker, lower the trigger.
+                </p>
+                <div class="meter"><div id="set-meter-fill" class="meter-fill"></div><div id="set-meter-mark" class="meter-mark"></div></div>
+                <p id="set-meter-text" class="field-note mono">level — · trigger —</p>
+              </section>
+
+              <!--
+                Music is the one tab that mostly REPORTS rather than sets. The
+                client id lives in .env and needs a restart, so it is not a
+                control the dialog can honestly offer — but this is where people
+                come looking, and "nothing here about Spotify" reads as "Greg
+                cannot do Spotify". public/settings.js fills it in from the
+                three states the server reports.
+              -->
+              <section class="tab-page" data-page="music" hidden>
+                <p id="set-spotify-state" class="field-note"></p>
+                <div id="set-spotify-steps"></div>
+                <p class="field-note">
+                  Pause, skip and volume work without any of this — they go through
+                  Windows, not Spotify, so they need no account at all. Only naming
+                  a particular song needs what is above.
+                </p>
+              </section>
+            </div>
+
+            <p id="settings-problem" class="settings-problem" hidden></p>
+
+            <div class="dialog-buttons">
+              <button id="settings-ok" class="btn btn-default" type="button">OK</button>
+              <button id="settings-cancel" class="btn" type="button">Cancel</button>
+              <button id="settings-apply" class="btn" type="button">Apply</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="voice.js"></script>
+  </body>
+</html>

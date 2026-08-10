@@ -1,0 +1,843 @@
+/* Greg, as a Windows 98 desktop application.
+ *
+ * The whole look is built out of one trick, used consistently: a 2px border
+ * where the light edges face the top-left and the dark edges face the
+ * bottom-right reads as "raised", and reversing it reads as "sunken". Buttons
+ * are raised, text fields and the screen recess are sunken, and pressing a
+ * button swaps it. Almost everything below is that idea applied to a different
+ * box.
+ */
+
+:root {
+  --face: #c0c0c0;          /* the grey everything is made of */
+  --face-light: #dfdfdf;
+  --white: #ffffff;
+  --shadow: #808080;
+  --dark: #000000;
+  --desktop: #008080;       /* the teal */
+  --title-a: #000080;
+  --title-b: #1084d0;
+  --title-inactive-a: #808080;
+  --ink: #000000;
+  --font: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--desktop);
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--ink);
+  /* Win98 rendered type without antialiasing; keeping it crisp matters more
+     than keeping it smooth. */
+  -webkit-font-smoothing: none;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------------------
+   Desktop and window
+   --------------------------------------------------------------------------- */
+
+.desktop {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+/* The window's WIDTH is what sets the size of the television, which is not
+   obvious and was the single thing making every channel hard to read.
+
+   The canvas is square, and its aspect ratio drives the whole column: the well
+   is as tall as it is wide, so a wider window is a taller well is a bigger
+   picture. At the old flat `min(420px, 100%)` the app was a 420px strip in the
+   middle of the screen whatever the monitor, giving a 390px canvas and a 312px
+   picture — the regime where teletext glyphs measure about 6px and the flight
+   list is unreadable.
+
+   Three terms, and each is load-bearing:
+     - `clamp(420px, ...)` floors it at exactly the old size, so no window can
+       come out smaller than it does today.
+     - `calc(100vh - 230px)` is the important one. The chrome above and below the
+       well measures 211px, so without a height term a wide window makes a well
+       TALLER THAN THE WINDOW and the television escapes its own frame — measured
+       at 900px wide on a 720px-tall viewport.
+     - `min(100%, ...)` keeps it inside a narrow viewport, where the 420px floor
+       would otherwise overflow horizontally.
+
+   Measured across viewport shapes — canvas px, old -> new: 900x600 390 -> 390,
+   1600x700 390 -> 440, 1920x1080 390 -> 820, 1600x1200 390 -> 940. Nothing
+   escapes the window and the type-here box stays visible at every size. */
+.window {
+  width: min(100%, clamp(420px, calc(100vh - 230px), 1100px));
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--face);
+  padding: 3px;
+  border: 2px solid;
+  border-color: var(--face-light) var(--dark) var(--dark) var(--face-light);
+  box-shadow: inset 1px 1px 0 var(--white), inset -1px -1px 0 var(--shadow);
+}
+
+.title-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 2px 0 3px;
+  background: linear-gradient(90deg, var(--title-a), var(--title-b));
+  color: var(--white);
+  font-weight: bold;
+  flex: none;
+}
+
+/* The window goes "inactive" when Greg's server has gone away — the same signal
+   Windows itself used, and it needs no explaining. */
+body[data-mode="offline"] .title-bar {
+  background: linear-gradient(90deg, var(--title-inactive-a), #b5b5b5);
+}
+
+.title-icon {
+  width: 16px;
+  height: 14px;
+  flex: none;
+  background: linear-gradient(#c9c2af, #9c9583);
+  border: 1px solid #3a352b;
+  position: relative;
+}
+
+.title-icon::after {
+  /* A tiny test card inside the tiny television. */
+  content: "";
+  position: absolute;
+  inset: 2px 2px 3px;
+  background: linear-gradient(
+    90deg,
+    #c0c0c0 0 14.3%, #c0c000 14.3% 28.6%, #00c0c0 28.6% 42.9%,
+    #00c000 42.9% 57.2%, #c000c0 57.2% 71.5%, #c00000 71.5% 85.8%, #0000c0 85.8% 100%
+  );
+}
+
+.title-text {
+  flex: 1;
+  letter-spacing: 0.2px;
+}
+
+.title-buttons {
+  display: flex;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.title-btn {
+  width: 16px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: bold;
+  color: var(--ink);
+  background: var(--face);
+  border: 1px solid;
+  border-color: var(--white) var(--dark) var(--dark) var(--white);
+  line-height: 1;
+}
+
+.window-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+   The screen
+   --------------------------------------------------------------------------- */
+
+.face-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A sunken well, so the television sits *inside* the application the way a
+   viewport would in a real Win98 program. */
+.screen-well {
+  width: 100%;
+  height: 100%;
+  min-height: 190px;
+  display: grid;
+  place-items: center;
+  background: #101418;
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark), inset -1px -1px 0 var(--face-light);
+}
+
+#face {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------------------
+   The wake dialog — a modal, because that is what Windows would have done
+   --------------------------------------------------------------------------- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  transition: opacity 0.18s steps(3, end);
+}
+
+.overlay.gone {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dialog {
+  width: min(260px, 88%);
+  background: var(--face);
+  padding: 3px;
+  border: 2px solid;
+  border-color: var(--face-light) var(--dark) var(--dark) var(--face-light);
+  box-shadow: inset 1px 1px 0 var(--white), inset -1px -1px 0 var(--shadow), 3px 3px 0 rgba(0, 0, 0, 0.35);
+}
+
+.dialog-title {
+  height: 18px;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  background: linear-gradient(90deg, var(--title-a), var(--title-b));
+  color: var(--white);
+  font-weight: bold;
+}
+
+.dialog-body {
+  padding: 12px 10px 10px;
+  text-align: center;
+}
+
+.overlay-note {
+  margin: 0 0 12px;
+  line-height: 1.45;
+}
+
+/* ---------------------------------------------------------------------------
+   Buttons
+   --------------------------------------------------------------------------- */
+
+.btn {
+  min-width: 68px;
+  min-height: 23px;
+  padding: 3px 12px;
+  background: var(--face);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 12px;
+  border: 2px solid;
+  border-color: var(--face-light) var(--dark) var(--dark) var(--face-light);
+  box-shadow: inset 1px 1px 0 var(--white), inset -1px -1px 0 var(--shadow);
+  cursor: pointer;
+}
+
+/* Pressing swaps the bevel and nudges the label — the whole button appears to
+   go in, which is the entire feedback mechanism of the era. */
+.btn:active {
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark), inset -1px -1px 0 var(--face-light);
+  padding: 4px 11px 2px 13px;
+}
+
+.btn:focus-visible {
+  outline: 1px dotted var(--ink);
+  outline-offset: -4px;
+}
+
+/* A toggle that is currently ON, drawn the way Win98 drew a pressed toolbar
+   button: sunk in, with the dithered check pattern showing through. */
+.btn-on,
+.btn-on:active {
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark), inset -1px -1px 0 var(--face-light);
+  background-color: var(--face-light);
+  background-image:
+    linear-gradient(45deg, var(--white) 25%, transparent 25%, transparent 75%, var(--white) 75%),
+    linear-gradient(45deg, var(--white) 25%, transparent 25%, transparent 75%, var(--white) 75%);
+  background-size: 4px 4px;
+  background-position: 0 0, 2px 2px;
+}
+
+/* Muted. Deliberately NOT the pressed look above: silence is a state the button
+   is reporting rather than a mode it has been put into, and it has to be
+   distinguishable at a glance from the microphone being off, which sits two
+   buttons away and means something entirely different. Greyed and struck
+   through — the icon still reads as a speaker, just a dead one. */
+.btn-off {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+/* A capability the model never proved can't be switched on, so the control says
+   so rather than offering a button that could only fail. */
+.btn:disabled {
+  color: var(--shadow);
+  text-shadow: 1px 1px 0 var(--white);
+  cursor: not-allowed;
+}
+
+/* The default button in a dialog carried an extra black ring. */
+.btn-default {
+  outline: 1px solid var(--dark);
+  outline-offset: 1px;
+}
+
+.icon-btn {
+  min-width: 26px;
+  width: 26px;
+  padding: 2px 0;
+  font-size: 13px;
+  flex: none;
+}
+
+.icon-btn:active {
+  padding: 3px 0 1px 1px;
+}
+
+.icon-btn.off {
+  color: var(--shadow);
+  /* Windows drew disabled text twice: white down-right, grey on top. */
+  text-shadow: 1px 1px 0 var(--white);
+}
+
+/* ---------------------------------------------------------------------------
+   Status, transcript, controls
+   --------------------------------------------------------------------------- */
+
+.status {
+  margin: 0;
+  text-align: center;
+  font-weight: bold;
+  min-height: 15px;
+}
+
+.transcript {
+  min-height: 52px;
+  max-height: 96px;
+  overflow-y: auto;
+  padding: 5px 6px;
+  background: var(--white);
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark), inset -1px -1px 0 var(--face-light);
+  user-select: text;
+}
+
+.you,
+.greg {
+  margin: 0;
+  line-height: 1.45;
+  display: none;
+}
+
+.you.visible,
+.greg.visible {
+  display: block;
+}
+
+.you {
+  color: #000080;
+  margin-bottom: 4px;
+}
+
+.greg {
+  color: var(--ink);
+}
+
+.controls {
+  display: flex;
+  gap: 5px;
+  align-items: stretch;
+}
+
+#input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 5px;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--white);
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark), inset -1px -1px 0 var(--face-light);
+  user-select: text;
+}
+
+#input:focus {
+  outline: none;
+}
+
+#input::placeholder {
+  color: var(--shadow);
+}
+
+.hint {
+  margin: 0;
+  text-align: center;
+  color: #404040;
+  line-height: 1.4;
+  min-height: 15px;
+}
+
+/* ---------------------------------------------------------------------------
+   Status bar
+   --------------------------------------------------------------------------- */
+
+.status-bar {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  flex: none;
+}
+
+.status-panel {
+  padding: 2px 5px;
+  border: 1px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-panel-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.badge {
+  min-width: 96px;
+}
+
+.badge.warn {
+  color: #800000;
+  font-weight: bold;
+}
+
+/* ---------------------------------------------------------------------------
+   Small screens
+   --------------------------------------------------------------------------- */
+
+@media (max-height: 620px) {
+  .screen-well {
+    min-height: 140px;
+  }
+  .transcript {
+    min-height: 38px;
+    max-height: 62px;
+  }
+  .hint {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .desktop {
+    padding: 0;
+  }
+  .window {
+    height: 100%;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Settings — a Win98 properties dialog
+
+   Same bevel language as everything else: raised for anything you press, sunken
+   for anything you type into or read out of. The tab strip is the one piece with
+   its own trick — the selected tab sits one pixel lower and hides the top edge
+   of the page below it, which is how the era joined the two together.
+   --------------------------------------------------------------------------- */
+
+.settings-overlay {
+  position: absolute;
+  z-index: 20;
+}
+
+.settings-overlay[hidden] {
+  display: none;
+}
+
+.settings-dialog {
+  width: min(340px, 94%);
+  max-height: 94%;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.settings-dialog .dialog-title {
+  justify-content: space-between;
+}
+
+/* The close button here is real, unlike the decorative furniture on the main
+   window — so it gets a pointer and a working press state. */
+.settings-dialog .title-btn-close {
+  cursor: pointer;
+  background: var(--face);
+  color: var(--ink);
+  border: 1px solid;
+  border-color: var(--white) var(--dark) var(--dark) var(--white);
+  width: 14px;
+  height: 13px;
+  font-size: 9px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.settings-dialog .title-btn-close:active {
+  border-color: var(--dark) var(--white) var(--white) var(--dark);
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 4px 0;
+  margin-bottom: -1px;
+}
+
+.tab {
+  padding: 3px 8px 4px;
+  background: var(--face);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 11px;
+  border: 1px solid;
+  border-color: var(--white) var(--shadow) var(--face) var(--white);
+  border-radius: 3px 3px 0 0;
+  cursor: pointer;
+}
+
+.tab[aria-selected="true"] {
+  /* Sits proud of the strip and covers the page's top border. */
+  padding: 4px 10px 5px;
+  margin-top: -2px;
+  background: var(--face-light);
+  z-index: 1;
+}
+
+.tab-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px;
+  margin: 0 4px;
+  background: var(--face);
+  border: 1px solid;
+  border-color: var(--white) var(--shadow) var(--shadow) var(--white);
+  text-align: left;
+}
+
+.tab-page[hidden] {
+  display: none;
+}
+
+.field {
+  display: block;
+  margin: 0 0 8px;
+}
+
+.field > span {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.field.inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.field.inline > span {
+  display: inline;
+  margin: 0;
+}
+
+.field input[type="text"],
+.field input[type="number"],
+.field textarea,
+.search-row input {
+  width: 100%;
+  padding: 3px 4px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 12px;
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark), inset -1px -1px 0 var(--face-light);
+}
+
+.field.inline input[type="number"] {
+  width: 74px;
+  flex: none;
+}
+
+.field textarea {
+  resize: vertical;
+  font-size: 12px;
+}
+
+.field-note {
+  margin: 0 0 10px;
+  color: #404040;
+  line-height: 1.4;
+  font-size: 11px;
+}
+
+.field-note.mono {
+  font-family: "Consolas", "Lucida Console", monospace;
+}
+
+/* "Everything is working" deserves to look different from a set of
+   instructions, so the Music tab can be read at a glance. */
+.field-note.ok {
+  color: #006000;
+  font-weight: bold;
+}
+
+/* Numbered setup steps. Narrow indent: the dialog is 560px at its widest and a
+   browser's default 40px padding wastes a seventh of the line. */
+.steps {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  color: #404040;
+  line-height: 1.45;
+  font-size: 11px;
+}
+
+.steps li {
+  margin-bottom: 6px;
+}
+
+.group {
+  margin: 0 0 8px;
+  padding: 6px 8px 8px;
+  border: 1px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+}
+
+.group legend {
+  padding: 0 4px;
+}
+
+.group-gap {
+  display: inline-block;
+  width: 14px;
+}
+
+.radio,
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 10px;
+  cursor: pointer;
+}
+
+.radio.block,
+.check {
+  display: flex;
+  margin: 0 0 4px;
+}
+
+.search-row {
+  display: flex;
+  gap: 4px;
+  margin: 2px 0 6px;
+}
+
+.search-row input {
+  flex: 1;
+}
+
+.search-row .btn {
+  min-width: 58px;
+}
+
+/* The result list is a sunken well, the way a Win98 list box was. */
+.results {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  max-height: 108px;
+  overflow-y: auto;
+  background: var(--white);
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark);
+}
+
+.results[hidden] {
+  display: none;
+}
+
+.results li {
+  padding: 3px 5px;
+  cursor: pointer;
+  line-height: 1.3;
+}
+
+.results li:hover,
+.results li[aria-selected="true"] {
+  background: var(--title-a);
+  color: var(--white);
+}
+
+.results .muted {
+  opacity: 0.7;
+}
+
+.results li:hover .muted {
+  opacity: 0.85;
+}
+
+.dial {
+  display: grid;
+  grid-template-columns: 74px 1fr 30px;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+
+.dial input[type="range"] {
+  width: 100%;
+  accent-color: var(--title-a);
+}
+
+.dial output {
+  text-align: right;
+  font-family: "Consolas", "Lucida Console", monospace;
+}
+
+.rule {
+  border: none;
+  border-top: 1px solid var(--shadow);
+  border-bottom: 1px solid var(--white);
+  margin: 10px 0;
+}
+
+/* Live microphone level, so the trigger above is set against something real
+   rather than guessed at. */
+.meter {
+  position: relative;
+  height: 14px;
+  margin: 2px 0 4px;
+  background: var(--white);
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark);
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  width: 0;
+  background: repeating-linear-gradient(90deg, var(--title-a) 0 5px, transparent 5px 7px);
+}
+
+.meter-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #c00000;
+}
+
+.settings-problem {
+  margin: 6px 8px 0;
+  padding: 4px 6px;
+  background: #ffffe1;
+  border: 1px solid var(--dark);
+  color: #800000;
+  line-height: 1.4;
+}
+
+.settings-problem[hidden] {
+  display: none;
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 8px;
+}
+
+/* The microphone picker. A Win98 combo box is a sunken field with a raised
+   button on the end; the native select gets close enough with the same bevel. */
+.field select {
+  width: 100%;
+  padding: 2px 3px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 12px;
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark), inset -1px -1px 0 var(--face-light);
+}
+
+/* The desktop colour picker's presets. Chunky squares with a sunken border,
+   because a row of flat swatches would be the one modern-looking thing in the
+   dialog. */
+.swatches {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.swatches button {
+  width: 22px;
+  height: 18px;
+  padding: 0;
+  cursor: pointer;
+  border: 2px solid;
+  border-color: var(--face-light) var(--dark) var(--dark) var(--face-light);
+}
+
+.swatches button:active {
+  border-color: var(--dark) var(--face-light) var(--face-light) var(--dark);
+}
+
+/* The one currently in use, marked so the row says which rather than only
+   offering. */
+.swatches button[aria-pressed="true"] {
+  outline: 2px dotted var(--ink);
+  outline-offset: -6px;
+}

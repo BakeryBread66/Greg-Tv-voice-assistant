@@ -1,0 +1,72 @@
+# Things that must never leave this machine.
+#
+# Greg records what is said in a room in someone's home, remembers facts about
+# them, and holds a working Spotify token. None of that is source code, and all
+# of it is irreversible once pushed — a secret in a public repo is burned even
+# if the next commit removes it.
+
+# --- Secrets ---------------------------------------------------------------
+.env
+spotify-tokens.json
+
+# --- Personal data ---------------------------------------------------------
+# The development log. It is the most useful document in the project and it is
+# also a detailed portrait of one machine and one person's habits - the card and
+# its memory budget, the monitor layout, and listening habits. It is addressed
+# to whoever is working on Greg
+# next, not to a reader, and several of its sections are forward-looking notes
+# that would be stale the day they were published.
+#
+# Everything in it that CONSTRAINS the code - the settings that look like
+# improvements and are not - is extracted into DECISIONS.md, which does ship.
+# Source comments saying "see CLAUDE.md" refer to this file; DECISIONS.md says
+# so, so the reference is explained rather than dangling.
+CLAUDE.md
+# config.json carries your location and coordinates. config.example.json is the
+# one that ships; copy it to config.json on a new machine.
+config.json
+# A verbatim log of everything said in front of him, across restarts.
+conversations.jsonl
+# Facts he has been told to remember about you.
+memory.json
+# Your timers, reminders and what they are for.
+reminders.json
+# What your dials have become, as opposed to where they started.
+personality.json
+# Pictures of your screen.
+screenshots/
+
+# --- Someone else's voice --------------------------------------------------
+# The cloned voice is built from a real person's recording. That is their voice,
+# not this project's, and it is not ours to publish. Piper's downloaded voice
+# models are large binaries that belong to their own projects too.
+voices/
+# And the SAME VOICE lives here too, which the rule above does not cover.
+# voice-audition/ is a listening comparison built during development. It holds
+# the reference recording plus five clones made from it, which are synthetic
+# speech in that person's voice. The clones are the more sensitive half: a
+# published voice clone of an identifiable person is the material voice-cloning
+# abuse is made of, and permission to use a recording for one private purpose is
+# not permission to publish it to anyone who wants it.
+#
+# Ignored WHOLESALE and staying that way. Parts of the folder are Piper output
+# from public models and would be safe on their own, but un-ignoring it means
+# hand-deleting individual files, and missing one publishes a voice clone of a
+# real person - irreversibly, since a repository can be cloned before a later
+# commit removes anything. The durable finding from that comparison is written
+# up in DECISIONS.md instead, which costs nothing and risks nothing.
+voice-audition/
+
+# --- Build, cache and downloads --------------------------------------------
+node_modules/
+cache/
+.venv-clone/
+__pycache__/
+*.pyc
+
+# --- Editor and OS ---------------------------------------------------------
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store

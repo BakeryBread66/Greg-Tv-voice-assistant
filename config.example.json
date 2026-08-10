@@ -1,0 +1,162 @@
+{
+  "name": "Greg",
+  "clonedVoice": {
+    "enabled": true,
+    "reference": "voices/greg-reference.wav",
+    "_comment": "exaggeration 0.3 is the flattest, most level delivery. Lower is NOT flatter - 0.2 goes draggy. 0.7 loses phrasing entirely.",
+    "exaggeration": 0.5,
+    "cfgWeight": 0.5,
+    "temperature": 0.8,
+    "device": "cuda",
+    "port": 4750
+  },
+  "conversationLog": {
+    "_comment": "Verbatim record of every exchange, kept across restarts, searchable by voice. DELETE /api/conversations wipes it.",
+    "enabled": true,
+    "file": "conversations.jsonl",
+    "keepDays": 90
+  },
+  "speechCache": {
+    "enabled": true,
+    "folder": "cache/tts",
+    "maxEntries": 500,
+    "warmOnStart": true
+  },
+  "_systemVoiceComment": "Windows own speech, used only if the local voice fails. It sits ABOVE the cloud voice so a local failure stays local. Leave voice empty for the Windows default; rate is -10 to 10.",
+  "_appearanceComment": "The desktop behind the window. Hex only. #008080 is the Windows 98 teal and the default; Settings has a picker with a few presets.",
+  "appearance": { "background": "#008080" },
+
+  "_volumeComment": "How loud he is, 0 to 1. The left-hand knob on the cabinet turns it, and so does the Volume slider in Settings. Covers the announcement chime as well as his voice. 1 is what he was before the knob existed.",
+  "volume": 1,
+
+  "_filesComment": "Folders Greg may look in when you ask him to find or read a file. READ-ONLY - he cannot write, move, rename or delete anything. No roots key at all means the default set (Documents, Downloads, Desktop, Pictures, Videos, Music under your user folder). An EMPTY roots list means nowhere, which is how you switch the whole thing off. Anything outside the roots is refused, and so is anything that looks like a key, token, .env or dotfile wherever it sits.",
+  "files": {},
+
+  "_subtitlesComment": "Page 888. auto shows what he is saying when he is muted, always shows it regardless, off never does. Without it a muted Greg answers into silence and then follows up as though he had told you something.",
+  "subtitles": "auto",
+
+  "_vocoderComment": "A WebAudio effect on his voice in the browser: band-limited, driven and ring-modulated so he sounds like he is coming through the television. Works on every voice including the cloud one. Toggle it in Settings.",
+  "vocoder": { "enabled": false, "amount": 0.6 },
+  "systemVoice": { "enabled": true, "voice": "", "rate": 0 },
+  "localVoice": {
+    "enabled": true,
+    "voice": "en_US-ryan-high",
+    "speed": 1,
+    "port": 4749
+  },
+  "voice": "en-GB-RyanNeural",
+  "rate": "+5%",
+  "pitch": "+0Hz",
+  "wakeWords": [
+    "hey greg",
+    "hi greg",
+    "hey craig",
+    "hey greh",
+    "hey gregg",
+    "a greg",
+    "hey grey"
+  ],
+  "personality": {
+    "humour": 45,
+    "edge": 15,
+    "directness": 60,
+    "warmth": 55,
+    "brevity": 70,
+    "formality": 30,
+    "mirror": true,
+    "style": ""
+  },
+  "followUp": {
+    "enabled": true,
+    "seconds": 7
+  },
+  "bargeIn": {
+    "_comment": "How long you must keep talking, continuously, before Greg stops. Raise if he cuts off too easily; 350 was too twitchy in practice.",
+    "enabled": true,
+    "sustainMs": 600
+  },
+  "listening": {
+    "_comment": "How far above the room's quiet level counts as speech. Raise floorMultiple if quiet noises trigger him.",
+    "floorMultiple": 3.5,
+    "minLevel": 0.012,
+    "deviceId": "default"
+  },
+  "spotify": {
+    "enabled": true,
+    "duckVolume": 25,
+    "minEpisodeMinutes": 5,
+    "redirectUri": ""
+  },
+  "screenshots": {
+    "enabled": true,
+    "folder": "screenshots",
+    "display": "primary",
+    "maxWidth": 0
+  },
+  "vision": {
+    "enabled": true,
+    "model": "qwen2.5vl:7b",
+    "maxWidth": 1280,
+    "display": "primary",
+    "think": false,
+    "keepAlive": ""
+  },
+  "alerts": {
+    "_comment": "Severe weather warnings interrupt whatever channel is showing and are read out. Severe/Extreme only, once per warning - on a typical day the national feed has ~190 alerts in force and this fires for ~44 of them, none of which are usually near you. enabled:false turns off the background poll entirely.",
+    "enabled": true,
+    "pollMs": 180000
+  },
+  "stocks": {
+    "_comment": "The Markets channel. Prices only - Greg does not comment on them and is not a financial adviser. Yahoo's keyless feed, one request per symbol, so keep the list short; 12 is the cap. Data is last-traded, not guaranteed real time.",
+    "index": "^IXIC",
+    "symbols": [
+      "AAPL",
+      "MSFT",
+      "NVDA",
+      "AMZN",
+      "GOOGL",
+      "TSLA"
+    ]
+  },
+  "apod": {
+    "_comment": "NASA picture of the day. Blank key means DEMO_KEY, which works with no signup but allows ~30 requests/hour and 50/day shared across everything on your IP. A free key from api.nasa.gov (email address, nothing else) lifts it to 1000/hour.",
+    "key": ""
+  },
+  "location": {
+    "_comment": "Leave mode \"auto\" to detect your city from your IP. Set \"pinned\" with a city, region, latitude and longitude to fix it — the coordinates are what the weather and radar actually use.",
+    "mode": "auto",
+    "city": "",
+    "region": "",
+    "latitude": null,
+    "longitude": null
+  },
+  "units": {
+    "temperature": "fahrenheit",
+    "windSpeed": "mph"
+  },
+  "provider": "auto",
+  "ollama": {
+    "url": "http://localhost:11434",
+    "model": "gemma4:e4b",
+    "think": "auto",
+    "temperature": 0.7,
+    "_contextComment": "gemma4:e4b supports 131072. Fixed overhead is ~4560 tokens/turn (system 1562 + tool schemas 2123 + an article 875), so 8192 left ~3600 for history and left articles at risk of truncating the system prompt. Measured: 8192->4861 MiB, 32768->5206 MiB, latency identical.",
+    "_keepAliveComment": "How long the brain stays loaded after answering. Ollama default is 5m, and gemma4:e4b is 9.6GB on disk: measured 1.7s to first sentence warm against 10.6s cold. Costs ~3.3GB of VRAM held between conversations. Use -1 to never unload.",
+    "keepAlive": "30m",
+    "contextTokens": 32768,
+    "timeoutMs": 120000
+  },
+  "speech": {
+    "mode": "auto",
+    "model": "base.en",
+    "device": "auto",
+    "python": "py",
+    "port": 4748
+  },
+  "model": "claude-opus-5",
+  "effort": "low",
+  "maxTokens": 700,
+  "port": 4747,
+  "openBrowser": true,
+  "identity": "a voice-controlled AI assistant living on the user's Windows PC, in the spirit of Jarvis from Iron Man"
+}
