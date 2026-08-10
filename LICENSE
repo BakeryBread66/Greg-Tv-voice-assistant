@@ -19,11 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This licence covers the code in this repository. Greg runs on a number of
-separate projects — faster-whisper, Piper, Chatterbox, PyTorch, Ollama and the
-language models you choose — which are not included here and carry their own
-terms. Piper voice models and any recording used to clone a voice are licensed
-by whoever made them. See the Licence section of README.md for the detail.
