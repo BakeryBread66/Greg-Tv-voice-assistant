@@ -1,0 +1,37 @@
+name: An idea
+description: A feature, a channel, or something he should be able to do
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Worth knowing before you write: a **channel** may not need a change to
+        Greg at all. A folder in `channels/` with a `channel.json` describing a
+        feed is a working channel, with caching and rate-limiting for free — see
+        `channels/README.md`. Same for a **persona**: one JSON file in
+        `personas/`.
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should he be able to do
+      description: What you would say to him, and what you would expect back.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: >
+        What you are trying to do, rather than the feature itself. It often turns
+        out something existing already covers it, or covers it better.
+
+  - type: markdown
+    attributes:
+      value: |
+        One thing that will be asked, so it may as well be said here: every tool
+        Greg has costs tokens on **every single turn**, and the schemas are held
+        under a hard ceiling by a test. A new tool has to be paid for by trimming
+        an existing one. Ideas that need no new tool — a channel, a persona, a
+        setting — are much cheaper to say yes to.

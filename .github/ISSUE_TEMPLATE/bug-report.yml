@@ -1,0 +1,69 @@
+name: Something is broken
+description: Anything other than a microphone problem
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Greg is built to say what went wrong rather than fail quietly, so the
+        console and the startup banner usually name the cause outright. Pasting
+        them is worth more than describing what you saw.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what he did, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: banner
+    attributes:
+      label: The startup banner
+      description: >
+        The block beginning "Greg is awake". It reports what actually loaded
+        rather than what was hoped for, so it rules a lot out immediately.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output around the problem
+      description: >
+        Anything the terminal printed when it went wrong. If he refused to start
+        at all, the whole thing — he names the failing step and says whether
+        anything was damaged.
+      render: text
+
+  - type: checkboxes
+    id: pieces
+    attributes:
+      label: Which optional pieces are installed
+      description: The banner answers this if you are not sure.
+      options:
+        - label: Ollama, with a model pulled
+        - label: Offline ears (faster-whisper)
+        - label: Offline voice (Piper)
+        - label: Screen vision
+        - label: The cloned voice
+        - label: Spotify
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 23H2
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      description: "`node --version`"
+      placeholder: v20.11.0
+    validations:
+      required: true

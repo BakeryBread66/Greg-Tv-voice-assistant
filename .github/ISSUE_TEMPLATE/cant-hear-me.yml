@@ -1,0 +1,83 @@
+name: He can't hear me
+description: The wake word does nothing, or he never responds to your voice
+labels: ["listening"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This has at least five causes that look identical from outside the
+        browser: the browser opened a different microphone from the one Windows
+        shows you, the track is muted at the OS level, capture is switched off,
+        your voice never clears the trigger level, or Whisper hears you fine and
+        returns something the wake matcher rejects.
+
+        The questions below are the ones that tell them apart. Most of the answer
+        is in one place: add `?mic` to Greg's address — **http://localhost:4747/?mic**
+        — and the line under his face becomes a live readout instead.
+
+  - type: textarea
+    id: banner
+    attributes:
+      label: The startup banner
+      description: >
+        The block the console prints when Greg starts, beginning "Greg is awake".
+        The `Ears:` line alone rules out about half of the possibilities.
+      render: text
+      placeholder: |
+        Face:     http://localhost:4747
+        Location: ...
+        Brain:    ...
+        Ears:     base.en on cuda (on this PC)
+        Voice:    ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: micreadout
+    attributes:
+      label: What ?mic shows
+      description: >
+        Open http://localhost:4747/?mic, click Wake, and talk. Copy the readout —
+        the device name, the level, the noise floor, the trigger, and the last
+        thing Whisper returned.
+      render: text
+    validations:
+      required: true
+
+  - type: dropdown
+    id: levelmoves
+    attributes:
+      label: Does the level bar move when you talk?
+      options:
+        - "Yes, and it crosses the trigger marker"
+        - "Yes, but it never reaches the trigger marker"
+        - "No, it stays at zero"
+        - "I haven't looked yet"
+    validations:
+      required: true
+
+  - type: input
+    id: statusline
+    attributes:
+      label: What does the line under his face say?
+      placeholder: 'Say "Hey Greg" — listening offline on this machine.'
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: Greg opens Chrome or Edge in app mode. If you opened him yourself, say where.
+      placeholder: Edge, opened by start-greg.bat
+    validations:
+      required: true
+
+  - type: textarea
+    id: anything
+    attributes:
+      label: Anything else
+      description: >
+        Worth mentioning if you changed headphones or audio devices recently —
+        the browser pins a microphone per site, and a device that has gone away
+        can still open successfully and deliver pure silence.
