@@ -161,6 +161,7 @@ pages rather than on this one, so this page stays readable:
 - **[His face and his channels](docs/channels.md)** — the television, all fourteen channels, the Global Dashboard
 - **[Talking to Greg](docs/talking-to-greg.md)** — how a conversation flows, things to say, personality and personas
 - **[What else he can do](docs/features.md)** — screen vision, music, files, subtitles, volume
+- **[Giving him a different voice](docs/voices.md)** — cloning somebody from ten seconds of recording, and the Piper voices
 - **[Configuration](docs/configuration.md)** — every setting, and which need a restart
 - **[Troubleshooting](docs/troubleshooting.md)** — when something is not working
 
