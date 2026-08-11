@@ -1597,3 +1597,70 @@ test("the setup advice survives an empty or missing status", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Eyes closed at startup, without becoming eyes that can never open
+//
+// `vision.enabled: false` already existed and records proven:false — which makes
+// setVisionEnabled refuse forever with "the model failed its eyesight test". The
+// test never ran, so that is a lie, and it is the proven/enabled conflation this
+// project keeps apart arriving through the config file.
+//
+// `openAtStartup: false` is the third state: nothing established either way, the
+// 5.9 GB model never loaded, and the real test run the first time somebody asks
+// to see something.
+// ---------------------------------------------------------------------------
+
+test("eyes can start closed without the model ever loading", async () => {
+  const { verifyVision, visionStatus } = await import("../lib/vision.js");
+
+  let described = 0;
+  const provider = { describeImage: async () => { described++; return "red"; } };
+
+  const status = await verifyVision(provider, { vision: { openAtStartup: false } });
+
+  assert.equal(described, 0, "the whole point: no swatch test, so no 5.9 GB model load");
+  assert.equal(status.enabled, false, "closed");
+  assert.equal(status.ok, false);
+  assert.equal(status.checked, false, "NOT checked — as against checked and failed");
+  assert.equal(status.proven, false);
+  assert.match(status.reason, /start closed/i);
+  assert.doesNotMatch(status.reason, /fail/i, "nothing failed; do not say it did");
+});
+
+test("and opening them later runs the test that was deferred", async () => {
+  const { verifyVision, proveVision, setVisionEnabled, visionStatus } = await import("../lib/vision.js");
+
+  let described = 0;
+  const provider = {
+    describeImage: async ({ imageBase64 }) => {
+      described++;
+      // Answer each swatch correctly, in the order SWATCHES declares them.
+      return described === 1 ? "red" : "blue";
+    },
+  };
+
+  await verifyVision(provider, { vision: { openAtStartup: false } });
+  assert.equal(setVisionEnabled(true).ok, false, "cannot open eyes that were never tested");
+
+  // What setVision does before flipping the switch.
+  await proveVision({ vision: {} });
+  assert.equal(described, 2, "both swatches, exactly once each");
+  assert.equal(visionStatus().proven, true, "a model that passes is now proven");
+  assert.equal(setVisionEnabled(true).ok, true, "and can be turned on");
+});
+
+test("a model that fails the deferred test is refused, not quietly enabled", async () => {
+  // The one thing this must never become: a way to arm the screen tool without
+  // passing the swatch test. gemma4 reports vision it does not have and answers
+  // "Black" to every colour.
+  const { verifyVision, proveVision, setVisionEnabled } = await import("../lib/vision.js");
+
+  const blind = { describeImage: async () => "Black" };
+  await verifyVision(blind, { vision: { openAtStartup: false } });
+  await proveVision({ vision: {} });
+
+  const result = setVisionEnabled(true);
+  assert.equal(result.ok, false, "deferring the test must not become skipping it");
+  assert.match(result.error, /eyesight test/i);
+});

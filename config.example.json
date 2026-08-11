@@ -95,6 +95,8 @@
   },
   "vision": {
     "enabled": true,
+    "_comment_openAtStartup": "false = eyes closed at startup and the 5.9 GB model never loads until you ask him to look. He can still open them on request; the eyesight test runs then.",
+    "openAtStartup": true,
     "model": "qwen2.5vl:7b",
     "maxWidth": 1280,
     "display": "primary",

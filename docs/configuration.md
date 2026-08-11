@@ -159,6 +159,18 @@ slider moves, because both go through the same place.
                                  // shows them regardless, "off" never does
   "units": { "temperature": "fahrenheit", "windSpeed": "mph" },
 
+  "vision": {
+    "enabled": true,             // false = no eyes at all, ever. He will say so
+                                 // and cannot be talked into it.
+    "openAtStartup": true        // false = eyes CLOSED at startup, and the
+                                 // 5.9 GB model is not loaded. He can still open
+                                 // them on request ("open your eyes"), and the
+                                 // eyesight test runs at that moment instead of
+                                 // during boot. Worth it on a card under 16 GB,
+                                 // where the eyes and the cloned voice cannot
+                                 // both be resident.
+  },
+
   "provider": "auto",            // "auto" | "ollama" | "anthropic"
   "ollama": {
     "model": "gemma4:e4b",
