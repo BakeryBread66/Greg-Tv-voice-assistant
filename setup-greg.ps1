@@ -182,6 +182,26 @@ function ClonePython() {
   return $null
 }
 
+# Is .venv-clone actually usable, or merely present?
+#
+# This was `Test-Path .venv-clone\Scripts\python.exe`, which is true the instant
+# the venv is created — BEFORE torch and chatterbox go in. So an install that
+# failed at the last step left a folder that every later run reported as
+# "already exists - leaving it alone", and the setup could never repair itself.
+# Reported from a second machine that failed on chatterbox and then could not
+# get back to a working state by re-running.
+#
+# The honest test is whether the thing imports, plus the watermarker perth
+# leaves as None when pkg_resources is missing — the two ways this venv is
+# known to be present and useless.
+function CloneVenvState() {
+  $vpy = ".venv-clone\Scripts\python.exe"
+  if (-not (Test-Path $vpy)) { return "none" }
+  $ok = & $vpy -c "import chatterbox.tts, perth; print(perth.PerthImplicitWatermarker is not None)" 2>$null
+  if ($LASTEXITCODE -eq 0 -and $ok -match "True") { return "ready" }
+  return "broken"
+}
+
 function Survey() {
   $gpu = $false
   if (Have "nvidia-smi") {
@@ -198,7 +218,7 @@ function Survey() {
     Piper    = (PyHas "piper")
     Gpu      = $gpu
     ClonePy  = (ClonePython)
-    CloneVenv= (Test-Path ".venv-clone\Scripts\python.exe")
+    CloneVenv= (CloneVenvState)
   }
 }
 
@@ -393,10 +413,34 @@ function DoClone($s) {
   # a working install is simply wrong. This check sat BELOW the Python one, so
   # the machine Greg was written on — which has a working .venv-clone — reported
   # the cloned voice as blocked on every run.
-  if ($s.CloneVenv) {
-    Record "cloned voice" "already" ".venv-clone exists"
-    Say "  .venv-clone already exists - leaving it alone." "Green"
+  if ($s.CloneVenv -eq "ready") {
+    Record "cloned voice" "already" ".venv-clone works"
+    Say "  .venv-clone already works - leaving it alone." "Green"
     return
+  }
+  # Present but not working: an install that died partway, which used to be
+  # indistinguishable from a finished one. Offer to start again, because there is
+  # no way to repair it in place and leaving it there is what blocked the retry.
+  if ($s.CloneVenv -eq "broken") {
+    Say "  .venv-clone exists but does not work - an install that stopped partway." "Yellow"
+    Say "  It cannot be repaired in place; the folder has to go and be rebuilt." "Yellow"
+    if ($DryRun) {
+      Say "  would delete .venv-clone and build it again" "Cyan"
+      Record "cloned voice" "planned" "rebuild half-finished venv"
+      return
+    }
+    if (-not (Ask "Delete .venv-clone and build it again?" "a few GB, re-downloaded" $true)) {
+      Record "cloned voice" "skipped" "half-finished venv kept"
+      Say "  Left alone. The cloned voice will not work until it is rebuilt." "Yellow"
+      return
+    }
+    Remove-Item ".venv-clone" -Recurse -Force -ErrorAction SilentlyContinue
+    if (Test-Path ".venv-clone") {
+      Record "cloned voice" "failed" "could not delete .venv-clone"
+      Say "  Could not delete .venv-clone - close anything using it and try again." "Red"
+      return
+    }
+    Say "  removed. Building fresh ..." "Cyan"
   }
   if (-not $s.ClonePy) {
     Record "cloned voice" "blocked" "no Python 3.10 or newer"
