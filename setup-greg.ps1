@@ -122,8 +122,41 @@ function OllamaHas([string]$model) {
 # while a uv-managed 3.12.8 sits on disk and runs the venv perfectly well. So
 # ask the launcher, and treat a no as "not reachable" rather than "not present".
 function Py312Path() {
-  if (-not (Have "py")) { return $null }
-  if ((Quiet "py" @("-3.12", "--version")) -eq 0) { return "py -3.12" }
+  # 1. The launcher, which is right when it works and silent when it is not.
+  if (Have "py") {
+    if ((Quiet "py" @("-3.12", "--version")) -eq 0) { return "py -3.12" }
+  }
+
+  # 2. On PATH under its own name, which is how most non-launcher installs land.
+  if (Have "python3.12") { return "python3.12" }
+
+  # 3. uv's managed runtimes. This is the case the comment above describes and
+  #    the script then gave up on anyway: a perfectly good 3.12.8 that `py` does
+  #    not know about, on the very machine Greg was written on.
+  if (Have "uv") {
+    $found = & uv python find 3.12 2>$null
+    if ($LASTEXITCODE -eq 0 -and $found -and (Test-Path $found)) { return $found.Trim() }
+  }
+
+  # 4. The usual places an installer puts it, per-user first.
+  $guesses = @(
+    "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
+    "$env:ProgramFiles\Python312\python.exe",
+    "C:\Python312\python.exe"
+  )
+  foreach ($g in $guesses) { if (Test-Path $g) { return $g } }
+
+  # 5. Anything uv has unpacked, newest first.
+  $uvDir = "$env:LOCALAPPDATA\uv\python"
+  if (Test-Path $uvDir) {
+    $hit = Get-ChildItem $uvDir -Directory -Filter "*3.12*" -ErrorAction SilentlyContinue |
+      Sort-Object Name -Descending |
+      ForEach-Object { Join-Path $_.FullName "python.exe" } |
+      Where-Object { Test-Path $_ } |
+      Select-Object -First 1
+    if ($hit) { return $hit }
+  }
+
   return $null
 }
 
@@ -215,12 +248,19 @@ function PullModel([string]$model) {
   }
 }
 
-function Ask([string]$question, [string]$size) {
-  if ($All)     { return $true }
+# $defaultYes false is for a tier that should never arrive unasked. -All then
+# still skips it, which is the documented behaviour for the cloned voice: it is
+# large, it needs a Python the launcher often cannot see, and it cannot finish
+# without a recording the user supplies. "Take everything" should not quietly
+# start that.
+function Ask([string]$question, [string]$size, [bool]$defaultYes = $true) {
+  if ($All)     { return $defaultYes }
   if ($Minimal) { return $false }
   if ($DryRun)  { return $true }
-  $answer = Read-Host "  $question ($size) [Y/n]"
-  return ($answer -eq "" -or $answer -match "^[Yy]")
+  $suffix = if ($defaultYes) { "[Y/n]" } else { "[y/N]" }
+  $answer = Read-Host "  $question ($size) $suffix"
+  if ($answer -eq "") { return $defaultYes }
+  return ($answer -match "^[Yy]")
 }
 
 # -------------------------------------------------------------------- tiers --
@@ -327,11 +367,23 @@ function DoClone($s) {
   Say "  voices/greg-reference.wav. Nothing ships one - that would be publishing" "Yellow"
   Say "  somebody's voice. See the README before you rely on this." "Yellow"
   Say ""
+  # Already built? Then nothing about Python matters, and saying "blocked" over
+  # a working install is simply wrong. This check sat BELOW the Python one, so
+  # the machine Greg was written on — which has a working .venv-clone — reported
+  # the cloned voice as blocked on every run.
+  if ($s.CloneVenv) {
+    Record "cloned voice" "already" ".venv-clone exists"
+    Say "  .venv-clone already exists - leaving it alone." "Green"
+    return
+  }
   if (-not $s.Py312) {
     Record "cloned voice" "blocked" "no reachable Python 3.12"
     Say "  Needs Python 3.12 exactly - torch 2.6.0 has no wheels for 3.13+." "Red"
-    Say "  The launcher cannot see a 3.12 on this machine. Install one with:" "Red"
+    Say "  No 3.12 found: not on the py launcher, not on PATH, not under uv," "Red"
+    Say "  and not in the usual install folders. Install one with:" "Red"
     Say "    winget install --id Python.Python.3.12 --exact" "Red"
+    Say "  If you already have one, pass its full path in config.json as" "Red"
+    Say "  clonedVoice.python and run this again." "Red"
     return
   }
   if ($DryRun) {
@@ -438,6 +490,27 @@ if ($Minimal) {
   if (Ask "Let him see your screen?"     "5.9 GB") { DoEyes  $survey } else { Record "eyes"  "skipped" "declined" }
 }
 
-if ($Clone) { DoClone $survey }
+# The cloned voice, which until now was reachable ONLY by passing -Clone.
+#
+# setup-greg.bat exists to be double-clicked — that is what its own comment says
+# it is for — and a double-click passes no arguments, so the interactive path
+# asked four questions and silently could not install this one at all. Reported
+# by somebody on a second machine who ran the setup, saw no .venv-clone, and had
+# no way to find out why. Every other tier has always had a prompt; this is the
+# only one that did not.
+#
+# Still defaults to NO, and -All still skips it. That part was deliberate and
+# stays: it is 6 GB, it needs Python 3.12 exactly, and it cannot finish without a
+# voice recording the user has to supply. Offering it is different from
+# assuming it.
+if ($Clone) {
+  DoClone $survey
+} elseif ($Minimal) {
+  Record "cloned voice" "skipped" "-Minimal"
+} elseif (Ask "Clone a real person's voice? Needs Python 3.12 and a recording you supply" "6 GB" $false) {
+  DoClone $survey
+} else {
+  Record "cloned voice" "skipped" "declined"
+}
 
 Summary $survey
