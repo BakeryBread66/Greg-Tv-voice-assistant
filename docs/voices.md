@@ -46,6 +46,28 @@ without touching it.
 
 Save it as `voices/whoever.wav`. That is the entire installation step.
 
+**How long the clip may be:**
+
+| | |
+| --- | --- |
+| **Aim for** | **10–30 seconds** of clear, continuous speech |
+| Refused above | 2 minutes, or 100 MB |
+| Refused below | 3 seconds |
+
+Ten seconds is as good as thirty — measured — so there is nothing to gain by
+going longer, and a great deal to lose. **Cloning re-reads the whole reference
+every single time Greg speaks**, including the warm-up before he is ready, so
+length is not a one-off cost. Half an hour of 48 kHz stereo is about 700 MB once
+decoded, on top of a 4 GB model: the process is killed outright and the only
+clue is `exited (null)`.
+
+That is a real report, not a hypothetical. The limits above exist so the clip is
+refused with a sentence naming the length and the fix, before anything is
+loaded. The 2-minute line is deliberately four times the useful maximum — it is
+a net for a file nobody trimmed, not a rule about style.
+
+Mono is preferred and any sample rate is fine; the model resamples anyway.
+
 ### 3. Point Greg at it
 
 There is deliberately **no voice command for this** — a swap takes about 45
@@ -189,6 +211,8 @@ reports what actually loaded rather than what was configured.
 | Clone never loads, no error | no Python 3.12; check `.venv-clone\Scripts\python.exe` exists |
 | It runs but is very slow | CPU-only torch — reinstall from the CUDA index |
 | A new `.onnx` is ignored | its `.onnx.json` is missing |
+| "that clip is N minutes long" | the reference is untrimmed — see the table above |
+| `exited (null)` on an older build | the same thing, before it was checked for. Trim the clip |
 | Voice changed in config but he sounds the same | the cache is keyed on the dials; if only the *reference file contents* changed, the key did not |
 | Nothing happens on a persona switch | gaming mode is on — it refuses to load the clone |
 

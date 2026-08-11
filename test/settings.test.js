@@ -567,3 +567,29 @@ test("an untrimmed reference is refused with the reason, not left to crash", asy
   // A file that is not a PCM WAV names that, rather than falling through.
   assert.match(referenceProblem(null), /PCM WAV/);
 });
+
+test("an oversized file is refused on size alone, before its header is trusted", async () => {
+  const { referenceProblem, MAX_REFERENCE_BYTES, MAX_REFERENCE_SECONDS, IDEAL_REFERENCE_SECONDS } =
+    await import("../lib/voices.js");
+
+  // Size is checked FIRST and without the header, because a file whose duration
+  // cannot be worked out is exactly the file whose duration should not be
+  // trusted. "not a PCM WAV" is a poor answer when the real one is "it is
+  // 350 MB" — and that is the case that started this.
+  const huge = referenceProblem(null, { bytes: 350 * 1024 * 1024 });
+  assert.match(huge, /350 MB/, "say how big it actually is");
+  assert.doesNotMatch(huge, /PCM WAV/, "size wins over the format complaint");
+
+  // A legitimate clip is nowhere near the ceiling: 30 s of 48 kHz stereo is
+  // about 5.8 MB, so the cap has orders of magnitude of headroom.
+  assert.equal(referenceProblem({ seconds: 12, channels: 1, rate: 24000, bits: 16 }, { bytes: 1_150_000 }), null);
+
+  // The two limits are exported so the docs and the dialog cannot drift from
+  // the code, and they have to stay in the right order.
+  assert.ok(MAX_REFERENCE_SECONDS > IDEAL_REFERENCE_SECONDS[1], "the refusal line sits above the useful range");
+  assert.equal(MAX_REFERENCE_BYTES, 100 * 1024 * 1024);
+  // 120 s of 96 kHz 24-bit stereo — beyond anything sensible — is ~69 MB, so a
+  // legitimate clip at the duration limit must never trip the byte limit.
+  const worstCase = MAX_REFERENCE_SECONDS * 96000 * 2 * 3;
+  assert.ok(worstCase < MAX_REFERENCE_BYTES, "the byte cap must not refuse a clip the duration cap allows");
+});
