@@ -51,11 +51,30 @@ test("the schemas stay affordable", () => {
   //
   // The unit is chars/4 over the JSON, which is a crude proxy: it counts
   // braces and quotes a real tokenizer would treat differently, so it reads
-  // high. Measured at 3277 with 23 tools; the ceiling leaves room for a couple
-  // more before anyone has to think about it again. Raise it deliberately, and
-  // only after looking at what grew.
+  // high.
+  //
+  // THE CEILING IS MEASURED NOW, not guessed. It sat at 3600 from the day it
+  // was written at 3277 with 23 tools, and every feature since was costed
+  // against a number nobody had checked. `bench/routing.mjs` swept 14 prompts
+  // against 28, 35 and 42 tools, three runs each, descriptions held fixed:
+  //
+  //   28 tools  3594 tk   42/42   avg  930 ms
+  //   35 tools  4176 tk   42/42   avg 1214 ms
+  //   42 tools  4645 tk   42/42   avg 1293 ms
+  //
+  // 126/126. Tool COUNT is not what constrains routing — and the negative
+  // control proves the battery could have said otherwise: padded with seven
+  // deliberate near-duplicates it fell to 17/21, with get_hardware_temps
+  // beating get_engineering 3/3. What decides routing is how well a name and
+  // description fit the request, which is what this assertion is a crude proxy
+  // for and why it stays.
+  //
+  // So 4200 is the 35-tool point: measured clean, and +21% latency rather than
+  // the +39% at 42. Latency is the real cost of a bigger schema block — not
+  // context (32k, ~18% used) and not accuracy. Raise it deliberately, only
+  // after looking at what grew, and re-run the bench past ~42 tools.
   const tokens = Math.round(JSON.stringify(TOOLS).length / 4);
-  assert.ok(tokens < 3600, `tool schemas are ~${tokens} proxy-tokens per turn, up from 3277 — check what grew`);
+  assert.ok(tokens < 4200, `tool schemas are ~${tokens} proxy-tokens per turn — check what grew, then see bench/routing.mjs`);
 });
 
 // Which tools change something in the world, and the words that cover each one
