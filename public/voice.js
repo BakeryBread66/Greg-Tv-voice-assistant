@@ -2185,6 +2185,21 @@ async function wake() {
     el.hint.textContent = `${config.name} is warming up — he can't hear you until he has finished.`;
   }
 
+  // Load the model behind the warm-up.
+  //
+  // The boot sequence and the greeting take about seven seconds and neither
+  // touches the brain, so the first question of a session used to pay the full
+  // cold start — 11.7 s measured, against ~1.5 s warm. Firing it here means the
+  // tube and the model heat up together, which is what the animation has always
+  // implied was happening.
+  //
+  // NOT awaited, and never to be. The rule this file has paid for once is that
+  // nothing goes in front of the picture: awaiting /api/settings to fix a small
+  // sound problem stopped the warm-up appearing at all, reported as "it looks
+  // like you just removed the startup sequence". A pre-load is an optimisation,
+  // so it gets its own catch and the picture never knows about it.
+  serverFetch("/api/warm", { method: "POST" }).catch(() => {});
+
   // Hold the greeting until the set has actually come on. He should not start
   // talking over his own POST screen. `.catch` rather than a bare await: this
   // is an animation, and nothing about it is worth losing the greeting over.

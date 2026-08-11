@@ -25,7 +25,7 @@ import { startAlertWatch, stopAlertWatch, onAlert } from "./lib/alertwatch.js";
 import { initConversationLog, logTurn, conversationStats, clearConversations } from "./lib/conversation-log.js";
 import { getCursor, stopCursorWatch } from "./lib/cursor.js";
 import { initCache, warmCache, cacheStats, DEFAULT_PHRASES } from "./lib/tts-cache.js";
-import { think, initBrain, describeBrain, initVision } from "./lib/brain.js";
+import { think, initBrain, describeBrain, initVision, warmBrain } from "./lib/brain.js";
 import { getLocation } from "./lib/location.js";
 import { getWeather, weatherToSentence } from "./lib/weather.js";
 // newsToSentence is no longer imported here: the globe fetches headlines to
@@ -216,6 +216,20 @@ const server = http.createServer(async (req, res) => {
     // --- Heartbeat: lets the page notice when Greg has been shut down ---
     if (url.pathname === "/api/health") {
       return sendJson(res, 200, { ok: true });
+    }
+
+    // --- Load the model while the set is still warming up ---
+    //
+    // Answered IMMEDIATELY rather than when the model has finished loading. The
+    // page fires this and forgets it, and a request left open for the nine
+    // seconds gemma4:e4b takes to read off the disk would sit in the browser's
+    // connection budget for the whole warm-up, behind which the boot sequence's
+    // own fetches are queued. Nothing is waiting on the answer.
+    if (url.pathname === "/api/warm" && req.method === "POST") {
+      warmBrain().then(({ warmed, reason }) => {
+        console.log(warmed ? `[brain] pre-loaded (${reason})` : `[brain] not pre-loaded: ${reason}`);
+      });
+      return sendJson(res, 202, { started: true });
     }
 
     // --- Startup info for the browser ---
