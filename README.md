@@ -2,11 +2,10 @@
 
 A local AI buddy with a face, a voice, and ears. Say **"Hey Greg"** and he answers out loud.
 
-![Greg idling on his test card: a floating television with antennae, showing SMPTE colour bars, a PLEASE STAND BY caption and a running clock, inside a Windows 98 window](docs/greg.png)
+![Greg: a floating television with antennae showing SMPTE colour bars and a PLEASE STAND BY caption, bobbing gently against a solid background](docs/greg-floating.gif)
 
-*Idling on channel 1. The clock is his uptime, the row of buttons along the bottom
-is everything he can be told to do with a mouse, and the picture reacts to his
-voice and yours.*
+*Idling on channel 1. He drifts like that the whole time he is waiting, and the
+picture reacts to your voice and to his own.*
 
 - **Hears you** — always listening for the wake word, no button press
 - **Talks back** — a natural neural voice, not a robot, and he starts before he's finished writing
@@ -122,6 +121,12 @@ Double-click **`start-greg.bat`**.
 A window opens with Greg's face. Click **Wake Greg**, allow microphone access when the browser asks, and say:
 
 > "Hey Greg, what's the weather?"
+
+![The Greg window: the floating television inside a Windows 98 frame, with a row of control buttons along the bottom, a type-here box, and a status line reading "Say Hey Greg — listening offline on this machine"](docs/greg.png)
+
+*The whole window. The clock on the test card is his uptime, the row of buttons is
+everything he can be told to do with a mouse, and the line underneath says which
+ears he is actually using.*
 
 The set warms up first — the tube strikes, a startup screen counts the memory and
 lists what actually loaded, and a Windows 98 splash comes up. About four seconds,
