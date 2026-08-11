@@ -1451,8 +1451,8 @@ test("the two new channels answer to 'show me', not to over-broad words", async 
 // Telling a missing file from a broken one
 //
 // The television face is loaded with a dynamic import, and when that fails
-// createFace falls back to the older head rather than throwing — a broken face
-// must cost you the face, not the assistant. But the two reasons it can fail
+// createFace falls back to the reduced face rather than throwing — a broken
+// face must cost you the face, not the assistant. But the two reasons it can fail
 // need different fixes: a module that could not be FETCHED means files are
 // missing from the install, and a module that loaded and THREW is a bug here.
 //

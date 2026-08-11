@@ -291,9 +291,12 @@ The window around it is Windows 98 — teal desktop, navy title bar, beveled
 buttons that press inward, sunken text field, status bar. When the server stops,
 the title bar goes grey and inactive, the way Windows itself signalled it.
 
-The gold chrome helmet Greg used to wear is still in the box. Add `?face=3d` to
-the address for it, `?face=2d` for its hand-drawn stand-in, or `?face=tv` to be
-explicit about the television.
+If the television face cannot be loaded — almost always an incomplete copy, with
+files missing from `public/channels/` — Greg falls back to a reduced face: a
+ring that shows whether he is listening, thinking or speaking, and moves with
+his voice. It says `REDUCED FACE` along the bottom so it is never mistaken for
+the real one, and the badge above the window names the file that failed. Add
+`?face=minimal` to see it deliberately.
 
 Weather, news, the channels, the voice, the ears and the brain all run without any API key or account — and the voice, ears and brain don't need the internet either.
 

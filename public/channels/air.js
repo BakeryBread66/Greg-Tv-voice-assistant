@@ -14,9 +14,9 @@ import { standby, ellipsize } from "./shared.js";
 
 export function draw(ctx, x, y, w, h, view) {
   const data = view.feed("air");
-  if (!data) return standby(ctx, x, y, w, h, "AIR QUALITY", "reading the air");
-  if (data.error) return standby(ctx, x, y, w, h, "AIR QUALITY", data.error);
-  if (data.aqi === null) return standby(ctx, x, y, w, h, "AIR QUALITY", `no reading for ${data.place}`);
+  if (!data) return standby(ctx, x, y, w, h, { message: "AIR QUALITY", detail: "reading the air" });
+  if (data.error) return standby(ctx, x, y, w, h, { message: "AIR QUALITY", detail: data.error });
+  if (data.aqi === null) return standby(ctx, x, y, w, h, { message: "AIR QUALITY", detail: `no reading for ${data.place}` });
 
   ctx.fillStyle = "#0a0d12";
   ctx.fillRect(x, y, w, h);

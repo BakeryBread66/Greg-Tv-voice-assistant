@@ -44,10 +44,6 @@ import { setWindowRect } from "./lib/screen.js";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, "public");
-// three.js is served straight out of node_modules so there's no vendored copy
-// to keep in sync. three.module.js imports ./three.core.js, so the whole build
-// directory is exposed rather than a single file.
-const THREE_DIR = path.join(ROOT, "node_modules", "three", "build");
 
 // The globe, its textures and the country outlines all ship inside the npm
 // packages — the CDN URLs you see in globe.gl examples are just unpkg serving
@@ -711,20 +707,6 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, {
           "Content-Type": MIME[path.extname(name).toLowerCase()] ?? "application/octet-stream",
           // These never change, and the blue marble is 1.4 MB.
-          "Cache-Control": "public, max-age=86400",
-        });
-        res.end(data);
-      });
-    }
-
-    // three.js, read-only, .js files only.
-    if (url.pathname.startsWith("/vendor/three/")) {
-      const name = path.basename(url.pathname);
-      if (!name.endsWith(".js")) return sendJson(res, 404, { error: "not found" });
-      return fs.readFile(path.join(THREE_DIR, name), (err, data) => {
-        if (err) return sendJson(res, 404, { error: "three.js is not installed — run: npm install" });
-        res.writeHead(200, {
-          "Content-Type": "text/javascript; charset=utf-8",
           "Cache-Control": "public, max-age=86400",
         });
         res.end(data);
