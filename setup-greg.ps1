@@ -132,16 +132,34 @@ function OllamaHas([string]$model) {
 # Prefers the launcher's default, which is the interpreter Whisper and Piper
 # already spawn: one fewer runtime on the machine and one fewer thing to explain.
 function ClonePython() {
-  if (Have "py") {
-    $v = & py -3 -c "import sys; print(sys.version_info.major, sys.version_info.minor)" 2>$null
-    if ($LASTEXITCODE -eq 0 -and $v) {
-      $parts = $v.Trim().Split(" ")
-      if ([int]$parts[0] -eq 3 -and [int]$parts[1] -ge 10) { return "py -3" }
+  # Newest FIRST is wrong here, and this is the correction that matters.
+  #
+  # spacy-pkuseg - pulled in by chatterbox - ships Windows wheels for cp39
+  # through cp313 and NOT cp314. On 3.14 pip falls back to building it from
+  # source, which needs Microsoft C++ Build Tools, several gigabytes that most
+  # people do not have and should not need. It succeeded on the machine this was
+  # tested on purely because that machine has Visual Studio build tools
+  # installed, which is as clean an example of "works on my machine" as this
+  # project has produced.
+  #
+  # So prefer a Python that has a prebuilt wheel, and treat 3.14 as the last
+  # resort rather than the first choice. 3.14 genuinely works - the model loads
+  # and speaks - it just costs a compiler to get there.
+  foreach ($ver in @("3.13", "3.12", "3.11", "3.10")) {
+    if (Have "py") {
+      if ((Quiet "py" @("-$ver", "--version")) -eq 0) { return "py -$ver" }
     }
+    if (Have "python$ver") { return "python$ver" }
+    $flat = $ver.Replace(".", "")
+    foreach ($g in @(
+      "$env:LOCALAPPDATA\Programs\Python\Python$flat\python.exe",
+      "$env:ProgramFiles\Python$flat\python.exe",
+      "C:\Python$flat\python.exe"
+    )) { if (Test-Path $g) { return $g } }
   }
 
-  # Then any specific version, newest first, however it was installed.
-  foreach ($ver in @("3.14", "3.13", "3.12", "3.11", "3.10")) {
+  # Nothing with a wheel. 3.14 only, which means compiling spacy-pkuseg.
+  foreach ($ver in @("3.14")) {
     if (Have "py") {
       if ((Quiet "py" @("-$ver", "--version")) -eq 0) { return "py -$ver" }
     }
@@ -429,6 +447,17 @@ function DoClone($s) {
   # Which torch depends on the Python: chatterbox asks for ==2.6.0 below 3.14
   # and >=2.9.0 at 3.14 and above, and there is no 2.6.0 wheel for cp314.
   $minor = & $vpy -c "import sys; print(sys.version_info.minor)"
+
+  # Say it BEFORE the 2.6 GB download, not after it fails.
+  if ([int]$minor -ge 14) {
+    Say "  Note: on Python 3.$minor, spacy-pkuseg has no prebuilt wheel and pip will" "Yellow"
+    Say "  compile it. That needs Microsoft C++ Build Tools. If it fails at the end" "Yellow"
+    Say "  with 'Failed building wheel for spacy-pkuseg', install Python 3.12 and" "Yellow"
+    Say "  run this again - it has a wheel and nothing needs compiling:" "Yellow"
+    Say "    winget install --id Python.Python.3.12 --exact" "Yellow"
+    Say ""
+  }
+
   $torchSpec = if ([int]$minor -ge 14) { "torch>=2.9.0" } else { "torch==2.6.0" }
   Say "  installing $torchSpec from PyTorch's CUDA index (about 2.6 GB) ..." "Cyan"
   & $vpy -m pip install $torchSpec --index-url "https://download.pytorch.org/whl/cu126"
@@ -436,7 +465,22 @@ function DoClone($s) {
 
   Say "  installing chatterbox-tts ..." "Cyan"
   & $vpy -m pip install chatterbox-tts
-  if ($LASTEXITCODE -ne 0) { Record "cloned voice" "failed" "chatterbox"; Say "  chatterbox FAILED." "Red"; return }
+  if ($LASTEXITCODE -ne 0) {
+    Record "cloned voice" "failed" "chatterbox"
+    Say "  chatterbox FAILED." "Red"
+    # The overwhelmingly common cause, and the message pip gives for it names a
+    # package nobody has heard of rather than the fix. Reported from a second
+    # machine: "Failed building wheel for spacy-pkuseg".
+    if ([int]$minor -ge 14) {
+      Say "  If that ended with 'Failed building wheel for spacy-pkuseg', it is not" "Red"
+      Say "  your fault and nothing is broken: that package has no wheel for Python" "Red"
+      Say "  3.$minor, so pip tried to compile it and there is no C++ compiler here." "Red"
+      Say "  The easy fix is a Python that has a wheel - 3.13 or 3.12:" "Red"
+      Say "    winget install --id Python.Python.3.12 --exact" "Red"
+      Say "  Then delete the .venv-clone folder and run this again." "Red"
+    }
+    return
+  }
 
   # chatterbox depends on setuptools and pip may have pulled a new one back in
   # while resolving it. Re-pin and verify, because the failure this prevents is

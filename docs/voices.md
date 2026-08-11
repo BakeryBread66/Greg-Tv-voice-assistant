@@ -34,11 +34,31 @@ It is **off by default even under `-All`** and is about 6 GB. Run
 `.\setup-greg.ps1 -DryRun -Clone` first to see the plan without changing
 anything.
 
-**Any Python from 3.10 to 3.14 works** — the setup uses whichever one Whisper
-and Piper already run on. An older version of this page said 3.12 exactly, which
-was true when `chatterbox-tts` pinned `torch==2.6.0` for everything. It now asks
-for `torch>=2.9.0` at 3.14 and above, and PyTorch ships CUDA wheels from cp39 to
-cp314. Tested end to end on 3.14.4 with torch 2.13.0+cu126.
+**Python 3.10 to 3.13 installs cleanly. 3.14 works but needs a C++ compiler.**
+
+The setup picks the newest Python it can find *that has prebuilt wheels*, which
+means 3.13 down to 3.10. It only falls back to 3.14 if that is all there is, and
+it says so before starting the download.
+
+An older version of this page said 3.12 exactly, on the grounds that
+`chatterbox-tts` pinned `torch==2.6.0`. That pin is gone — it asks for
+`torch>=2.9.0` at 3.14 and above, and PyTorch ships CUDA wheels from cp39 to
+cp314. Tested end to end on 3.14.4 with torch 2.13.0+cu126: the model loads,
+CUDA is seen, and it speaks.
+
+**But `spacy-pkuseg`, which chatterbox pulls in, ships wheels only up to
+cp313.** On 3.14 pip compiles it from source, which needs Microsoft C++ Build
+Tools — several gigabytes most people neither have nor should need. The 3.14
+test above only passed because that machine happened to have Visual Studio build
+tools installed.
+
+So if you see **`Failed building wheel for spacy-pkuseg`**, nothing is broken and
+it is not your setup. Install 3.12 or 3.13, delete `.venv-clone`, and run the
+setup again:
+
+```powershell
+winget install --id Python.Python.3.12 --exact
+```
 
 **One pin that is not optional: `setuptools<81`.** `resemble-perth`, which
 chatterbox loads to watermark its output, still does
@@ -226,6 +246,7 @@ reports what actually loaded rather than what was configured.
 | Clone never loads, no error | no Python 3.12; check `.venv-clone\Scripts\python.exe` exists |
 | It runs but is very slow | CPU-only torch — reinstall from the CUDA index |
 | `'NoneType' object is not callable` | setuptools 81+ removed pkg_resources; pin `setuptools<81` |
+| `Failed building wheel for spacy-pkuseg` | Python 3.14 has no wheel for it; use 3.12 or 3.13 |
 | A new `.onnx` is ignored | its `.onnx.json` is missing |
 | "that clip is N minutes long" | the reference is untrimmed — see the table above |
 | `exited (null)` on an older build | the same thing, before it was checked for. Trim the clip |
