@@ -1999,6 +1999,22 @@ function paintPower(state) {
 }
 
 async function switchPower(what, on) {
+  // Say something BEFORE the request, because one of these is now slow.
+  //
+  // With vision.openAtStartup false the eyesight test is deferred, so the first
+  // press loads a 5.9 GB model and describes two swatches — measured at 5.8 s.
+  // The handler used to show nothing until the fetch resolved, so the button sat
+  // there looking dead and inviting a second click, which fired a second
+  // request. Reported as "I press the vision button and nothing changes".
+  const button = what === "vision" ? el.eyesBtn : el.gamingBtn;
+  const slow = on && (what === "gamingMode" || !power?.vision?.proven);
+  if (button) button.disabled = true;
+  if (slow && what === "vision") {
+    el.hint.textContent = power?.vision?.proven
+      ? "Opening his eyes…"
+      : "Opening his eyes — checking he can actually see, which takes a few seconds the first time.";
+  }
+
   try {
     const res = await fetch("/api/power", {
       method: "POST",
@@ -2015,11 +2031,21 @@ async function switchPower(what, on) {
       el.hint.textContent = on
         ? "Gaming mode on — eyes closed, voice back to the built-in one, about 10 GB freed."
         : "Gaming mode off — cloned voice loading, about 45 seconds.";
+    } else if (on && !data.vision?.active) {
+      // Asked for eyes and did not get them. The model can fail its eyesight
+      // test on the deferred path exactly as it can at startup, and that must
+      // not read as success because the request returned 200.
+      el.hint.textContent = data.vision?.reason
+        ? `His eyes stayed shut — ${data.vision.reason}`
+        : "His eyes stayed shut.";
     } else {
       el.hint.textContent = on ? "Eyes open." : "Eyes closed — about 5.9 GB freed.";
     }
   } catch {
     el.hint.textContent = "couldn't reach Greg to change that";
+  } finally {
+    // In a finally so a failed request cannot leave the button dead forever.
+    if (button) button.disabled = false;
   }
 }
 
