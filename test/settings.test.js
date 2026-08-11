@@ -593,3 +593,45 @@ test("an oversized file is refused on size alone, before its header is trusted",
   const worstCase = MAX_REFERENCE_SECONDS * 96000 * 2 * 3;
   assert.ok(worstCase < MAX_REFERENCE_BYTES, "the byte cap must not refuse a clip the duration cap allows");
 });
+
+test("a CUDA failure is reported as what to do, not as torch's debugging advice", async () => {
+  const { usefulError } = await import("../lib/voices.js");
+
+  // Real shape, reported by a user on an 8 GB card. The last 200 characters of
+  // this — which is what was being shown — are entirely generic and name
+  // neither memory nor the card.
+  const oom = [
+    "Traceback (most recent call last):",
+    "  File \"clone_server.py\", line 53, in <module>",
+    "torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 GiB. GPU 0 has a total capacity of 8.00 GiB.",
+    "CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.",
+    "For debugging consider passing CUDA_LAUNCH_BLOCKING=1",
+    "Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.",
+  ].join("\n");
+
+  const said = usefulError(oom);
+  assert.match(said, /ran out of memory/i, "name the actual cause");
+  assert.match(said, /2\.00 GiB/, "and how much it was short by, which is in the text");
+  assert.match(said, /eyes off|cpu/i, "and something the reader can do about it");
+  assert.doesNotMatch(said, /CUDA_LAUNCH_BLOCKING/, "not torch's advice to a developer");
+
+  // Anything else: the exception line, which is where a traceback says what
+  // stopped it — not the last line, which may be a caret or a hint.
+  assert.match(
+    usefulError("Traceback (most recent call last):\n  File \"x\"\nModuleNotFoundError: No module named 'chatterbox'"),
+    /^ModuleNotFoundError/,
+  );
+
+  // The last exception wins when several are chained, because that is the one
+  // that actually stopped it.
+  assert.match(usefulError("ValueError: first\nDuring handling...\nRuntimeError: second"), /^RuntimeError: second/);
+
+  // No stderr at all is empty rather than a crash — the caller joins it onto a
+  // sentence, and "undefined" reaching a user is its own small failure.
+  assert.equal(usefulError(""), "");
+  assert.equal(usefulError(null), "");
+  assert.equal(usefulError(undefined), "");
+
+  // Falls back to the last line when there is no exception to find.
+  assert.equal(usefulError("just some noise\nand a final line"), "and a final line");
+});
