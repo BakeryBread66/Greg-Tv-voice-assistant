@@ -867,7 +867,13 @@ function replayLast() {
   if (!clips.length) return false;
 
   for (const clip of clips) {
-    speech.items.push({ text: clip.text, audio: Promise.resolve(clip.blob), done: () => {}, cached: true });
+    speech.items.push({
+      text: clip.text,
+      sentences: clip.sentences ?? null,
+      audio: Promise.resolve(clip.blob),
+      done: () => {},
+      cached: true,
+    });
   }
   drainSpeech();
   return true;
@@ -1090,7 +1096,10 @@ async function drainSpeech() {
       // `cached` items came FROM a replay; re-capturing them would grow the
       // list every time you asked twice.
       if (blob && !item.cached) {
-        replayClips.push({ text: item.text, blob, gen: askGeneration });
+        // `sentences` travels with the clip: a replayed clip that holds several
+        // of them must still walk its subtitle, or "what?" on a muted set gives
+        // back the right audio under a subtitle clipped to four lines.
+        replayClips.push({ text: item.text, sentences: item.sentences, blob, gen: askGeneration });
         if (replayClips.length > 12) replayClips.shift();
       }
 
@@ -1099,10 +1108,18 @@ async function drainSpeech() {
       // advanced through them during playback rather than set once. Set for
       // BOTH paths, because the browser's own voice is the one most likely to
       // be missing something worth reading.
-      face.setSpeech?.(item.sentences?.[0] ?? item.text);
-
-      if (blob) await playClip(blob, item.sentences);
-      else await browserSpeak(item.text);
+      if (blob) {
+        // Sentence one now; playClip walks the rest from the audio's position.
+        face.setSpeech?.(item.sentences?.[0] ?? item.text);
+        await playClip(blob, item.sentences);
+      } else {
+        // The browser's own voice gives no position to track, so show the WHOLE
+        // clip. Clipped at four lines is bad; sitting on sentence one while he
+        // says all four is worse, because it is confidently wrong rather than
+        // visibly incomplete.
+        face.setSpeech?.(item.text);
+        await browserSpeak(item.text);
+      }
       item.done();
 
       // Let the tail drain before the next sentence starts on top of it.
