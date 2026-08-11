@@ -33,7 +33,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
-    "globe.gl": "^2.46.1",
-    "three": "^0.185.1"
+    "globe.gl": "^2.46.1"
   }
 }

@@ -52,8 +52,8 @@ export function format(value, { prefix = "", suffix = "", decimals = null } = {}
 
 export function draw(ctx, x, y, w, h, view, channel) {
   const wrapper = view.feed(channel.id);
-  if (!wrapper) return standby(ctx, x, y, w, h, channel.name.toUpperCase(), "waiting for the feed");
-  if (wrapper.error) return standby(ctx, x, y, w, h, channel.name.toUpperCase(), wrapper.error);
+  if (!wrapper) return standby(ctx, x, y, w, h, { message: channel.name.toUpperCase(), detail: "waiting for the feed" });
+  if (wrapper.error) return standby(ctx, x, y, w, h, { message: channel.name.toUpperCase(), detail: wrapper.error });
 
   // addonLoader() wraps the payload as { data, place }, so `display` paths are
   // written against the feed's own shape rather than against our envelope.

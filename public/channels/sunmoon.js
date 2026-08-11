@@ -15,8 +15,8 @@ export function draw(ctx, x, y, w, h, view) {
   // feed(id), not feed — the id is checked inside, so a reply that arrives
   // after a channel change cannot be painted into the wrong slot.
   const data = view.feed("sunmoon");
-  if (!data) return standby(ctx, x, y, w, h, "SUN & MOON", "working out the sky");
-  if (data.error) return standby(ctx, x, y, w, h, "SUN & MOON", data.error);
+  if (!data) return standby(ctx, x, y, w, h, { message: "SUN & MOON", detail: "working out the sky" });
+  if (data.error) return standby(ctx, x, y, w, h, { message: "SUN & MOON", detail: data.error });
 
   ctx.fillStyle = "#060814";
   ctx.fillRect(x, y, w, h);

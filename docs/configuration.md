@@ -252,11 +252,8 @@ Greg/
 │   └── location.js       Where "here" is
 └── public/
     ├── index.html
-    ├── face.js           Picks the renderer
+    ├── face.js           Picks the renderer, and IS the reduced fallback face
     ├── face-tv.js        The floating TV head (the default)
-    ├── face-3d.js        The old gold helmet, ?face=3d (three.js)
-    ├── face-2d.js        Hand-drawn helmet, ?face=2d, no WebGL needed
-    ├── led-panel.js      The LED expression, shared by the two helmets
     ├── globe.html        The Global Dashboard window
     ├── globe-app.js      Globe, country picking, the readout panel
     ├── globe.css         Win98 dressing for the dashboard
