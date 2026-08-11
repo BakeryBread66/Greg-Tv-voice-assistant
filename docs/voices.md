@@ -103,6 +103,21 @@ a net for a file nobody trimmed, not a rule about style.
 
 Mono is preferred and any sample rate is fine; the model resamples anyway.
 
+**If what you have is longer, there is a tool for it:**
+
+```powershell
+node trim-voice.mjs "some long recording.wav" voices/whoever.wav
+```
+
+It writes a mono WAV of the most continuously-voiced stretch it can find —
+rather than the first ten seconds, which are usually a breath, a countdown or
+silence. Silence in a reference is worse than a shorter clip, because it teaches
+the model to pause. `--seconds 15` if you want a bit more. It never overwrites
+the file you give it.
+
+Renaming a long recording does not shorten it, which has now caught two people
+with the same file.
+
 ### 3. Point Greg at it
 
 There is deliberately **no voice command for this** — a swap takes about 45
