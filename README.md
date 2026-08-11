@@ -21,11 +21,17 @@ picture reacts to your voice and to his own.*
 
 ## What you need
 
-**Windows 10 or 11.** Greg is Windows-only today. He leans on PowerShell for
-screen capture and the media session, on Windows' own speech as a fallback
-voice, and he ships `.bat` launchers. Nothing in the design prevents a Linux or
-macOS port — most of the code is plain Node and browser JavaScript, with only a
-handful of modules touching Windows — but nobody has written one.
+**Windows 10 or 11**, where everything works and everything has been used.
+
+**Linux boots too**, with five Windows-only features off — screen vision, cursor
+tracking, now playing, media keys and the system voice. The brain, the ears, the
+voice, all fourteen channels and every tool but two work unchanged, and he names
+what is missing in the startup banner rather than letting you find out when
+something quietly does nothing. Run `./start-greg.sh`. **Nobody has run him on a
+Linux desktop yet** — see [docs/linux.md](docs/linux.md), including what each
+missing piece would take, most of which is easier there than it was here.
+
+macOS is in the same position and even less tested.
 
 **Node.js 20 or newer.** The only piece that is genuinely required. Everything
 else on this page is optional.

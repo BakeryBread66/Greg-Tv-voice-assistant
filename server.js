@@ -26,6 +26,7 @@ import { initConversationLog, logTurn, conversationStats, clearConversations } f
 import { getCursor, stopCursorWatch } from "./lib/cursor.js";
 import { initCache, warmCache, cacheStats, DEFAULT_PHRASES } from "./lib/tts-cache.js";
 import { think, initBrain, describeBrain, initVision, warmBrain } from "./lib/brain.js";
+import { browserCommand, platformNotice, onPath } from "./lib/platform.js";
 import { getLocation } from "./lib/location.js";
 import { getWeather, weatherToSentence } from "./lib/weather.js";
 // newsToSentence is no longer imported here: the globe fetches headlines to
@@ -745,22 +746,22 @@ function personalityLine(character) {
 }
 
 function openBrowser(url) {
-  const chromePaths = [
-    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  ];
-  const browser = chromePaths.find((p) => fs.existsSync(p));
+  // Which browser, and how, is decided in lib/platform.js as a SPEC rather than
+  // a spawn, so the choice is testable without launching anything. Windows gets
+  // Chrome or Edge at a known absolute path; elsewhere it is whichever Chromium
+  // is on PATH, falling back to xdg-open or macOS's `open`.
+  const lookFor = (p) =>
+    p.includes("\\") || p.startsWith("/") ? fs.existsSync(p) : onPath(p, { exists: fs.existsSync });
+  const { command, args, appMode } = browserCommand(url, { exists: lookFor });
 
   try {
-    if (browser) {
-      // App mode: no address bar, feels like a real desktop app.
-      spawn(browser, [`--app=${url}`, "--window-size=560,780"], { detached: true, stdio: "ignore" }).unref();
-    } else {
-      spawn("cmd", ["/c", "start", "", url], { detached: true, stdio: "ignore" }).unref();
-    }
+    spawn(command, args, { detached: true, stdio: "ignore" }).unref();
+    // No --app means an ordinary tab WITH an address bar, which changes the
+    // advice for a blocked microphone — public/mic-help.js tells people to click
+    // the padlock, and in app mode there is no address bar holding one.
+    if (!appMode) console.log(`[greg] opened in your default browser: ${url}`);
   } catch {
-    console.log(`Open ${url} in Chrome to talk to Greg.`);
+    console.log(`Open ${url} in Chrome or Edge to talk to ${config.name ?? "Greg"}.`);
   }
 }
 
@@ -988,6 +989,21 @@ server.listen(PORT, "127.0.0.1", async () => {
     Ctrl+C here to shut him down.
   ==================================================
 `);
+
+  // What this OS cannot do, said once, plainly.
+  //
+  // Five modules shell out to PowerShell, and each already catches a failed
+  // spawn — so away from Windows they degrade rather than crash. They degrade
+  // SILENTLY though, and somebody whose "what's on my screen" quietly does
+  // nothing has no way to find out why. Nothing has gone wrong here; these were
+  // never written for this platform, and saying so is not the same as reporting
+  // a fault. Null on Windows: a line confirming everything works is noise.
+  const platform = platformNotice();
+  if (platform) {
+    console.log(`  ${platform.headline}`);
+    for (const line of platform.missing) console.log(`    - ${line}`);
+    console.log(`  ${platform.help}\n`);
+  }
 
   if (config.openBrowser !== false) openBrowser(url);
 });
