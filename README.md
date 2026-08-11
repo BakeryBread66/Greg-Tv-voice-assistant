@@ -45,9 +45,28 @@ about 10 GB for a brain on your own machine, around 16 GB for everything
 including his eyes.
 
 **An NVIDIA card is optional.** Hearing works on the CPU and is perfectly
-usable. A card mainly buys you fast screen vision and the cloned voice; ~6 GB of
-video memory is comfortable for the brain alone, ~12 GB if you want the eyes
-open at the same time.
+usable. A card mainly buys you fast screen vision and the cloned voice.
+
+Measured, resident, on a 24 GB card:
+
+| | |
+| --- | ---: |
+| Brain (`gemma4:e4b`) | 3.4 GB |
+| Ears (Whisper) | ~1 GB |
+| Eyes (`qwen2.5vl:7b`) | 5.9 GB |
+| Cloned voice | 5.4 GB |
+
+So **~6 GB** runs the brain and ears comfortably and **~12 GB** adds the eyes.
+The **cloned voice wants about 16 GB** to sit alongside the rest — and on **8 GB
+it does not fit at all**, even with the eyes switched off, because the brain and
+the clone alone come to 8.8 GB. Piper is the answer on a smaller card and it is
+a good one: it runs on the CPU, uses no video memory, and is nine times faster
+than realtime.
+
+Running the clone on the CPU instead (`clonedVoice.device`) does work, and is
+too slow to talk to — measured at **3.7x realtime**, about twelve seconds before
+he starts a one-sentence reply. An NPU does not help either: it has no memory of
+its own to lend, and none of the four engines can target one.
 
 ## Setting him up
 
