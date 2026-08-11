@@ -26,9 +26,8 @@ param(
   [switch]$All,
   # Node only. Greg runs, on the cloud voice and browser speech recognition.
   [switch]$Minimal,
-  # The cloned voice. Off by default even under -All: it is about 6 GB, it needs
-  # a Python 3.12 that the launcher often cannot see, and it cannot finish
-  # without a voice recording you supply yourself.
+  # The cloned voice. Off by default even under -All: it is about 6 GB and it
+  # cannot finish without a voice recording you supply yourself.
   [switch]$Clone
 )
 
@@ -117,44 +116,49 @@ function OllamaHas([string]$model) {
   return ($list -like "*$model*")
 }
 
-# The Python the clone venv needs. The launcher is NOT a reliable answer here:
-# on the machine this was written on, `py -3.12` reports no matching runtime
-# while a uv-managed 3.12.8 sits on disk and runs the venv perfectly well. So
-# ask the launcher, and treat a no as "not reachable" rather than "not present".
-function Py312Path() {
-  # 1. The launcher, which is right when it works and silent when it is not.
+# The Python the clone venv needs - which is now almost any of them.
+#
+# This demanded 3.12 EXACTLY. That was true when it was written and is not now.
+# chatterbox-tts 0.1.7 declares torch==2.6.0 below Python 3.14 and torch>=2.9.0
+# at 3.14 and above, and PyTorch ships CUDA wheels from cp39 through cp314. So
+# every Python from 3.10 to 3.14 can run the cloned voice, given the matching
+# torch. 3.13 is included and is not the gap it looks like: torch 2.6.0 has
+# cp313 wheels.
+#
+# Tested end to end on 3.14.4 with torch 2.13.0+cu126 - model loaded, CUDA seen,
+# 2.12 seconds of non-silent audio generated. Most people already have a Python
+# that works and were being told to go and install another one.
+#
+# Prefers the launcher's default, which is the interpreter Whisper and Piper
+# already spawn: one fewer runtime on the machine and one fewer thing to explain.
+function ClonePython() {
   if (Have "py") {
-    if ((Quiet "py" @("-3.12", "--version")) -eq 0) { return "py -3.12" }
+    $v = & py -3 -c "import sys; print(sys.version_info.major, sys.version_info.minor)" 2>$null
+    if ($LASTEXITCODE -eq 0 -and $v) {
+      $parts = $v.Trim().Split(" ")
+      if ([int]$parts[0] -eq 3 -and [int]$parts[1] -ge 10) { return "py -3" }
+    }
   }
 
-  # 2. On PATH under its own name, which is how most non-launcher installs land.
-  if (Have "python3.12") { return "python3.12" }
+  # Then any specific version, newest first, however it was installed.
+  foreach ($ver in @("3.14", "3.13", "3.12", "3.11", "3.10")) {
+    if (Have "py") {
+      if ((Quiet "py" @("-$ver", "--version")) -eq 0) { return "py -$ver" }
+    }
+    if (Have "python$ver") { return "python$ver" }
+    $flat = $ver.Replace(".", "")
+    foreach ($g in @(
+      "$env:LOCALAPPDATA\Programs\Python\Python$flat\python.exe",
+      "$env:ProgramFiles\Python$flat\python.exe",
+      "C:\Python$flat\python.exe"
+    )) { if (Test-Path $g) { return $g } }
+  }
 
-  # 3. uv's managed runtimes. This is the case the comment above describes and
-  #    the script then gave up on anyway: a perfectly good 3.12.8 that `py` does
-  #    not know about, on the very machine Greg was written on.
+  # uv's managed runtimes, which the py launcher does not know about - the case
+  # the previous version described in a comment and then gave up on anyway.
   if (Have "uv") {
-    $found = & uv python find 3.12 2>$null
-    if ($LASTEXITCODE -eq 0 -and $found -and (Test-Path $found)) { return $found.Trim() }
-  }
-
-  # 4. The usual places an installer puts it, per-user first.
-  $guesses = @(
-    "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
-    "$env:ProgramFiles\Python312\python.exe",
-    "C:\Python312\python.exe"
-  )
-  foreach ($g in $guesses) { if (Test-Path $g) { return $g } }
-
-  # 5. Anything uv has unpacked, newest first.
-  $uvDir = "$env:LOCALAPPDATA\uv\python"
-  if (Test-Path $uvDir) {
-    $hit = Get-ChildItem $uvDir -Directory -Filter "*3.12*" -ErrorAction SilentlyContinue |
-      Sort-Object Name -Descending |
-      ForEach-Object { Join-Path $_.FullName "python.exe" } |
-      Where-Object { Test-Path $_ } |
-      Select-Object -First 1
-    if ($hit) { return $hit }
+    $found = & uv python find ">=3.10" 2>$null
+    if ($LASTEXITCODE -eq 0 -and $found -and (Test-Path $found.Trim())) { return $found.Trim() }
   }
 
   return $null
@@ -175,7 +179,7 @@ function Survey() {
     Whisper  = (PyHas "faster_whisper")
     Piper    = (PyHas "piper")
     Gpu      = $gpu
-    Py312    = (Py312Path)
+    ClonePy  = (ClonePython)
     CloneVenv= (Test-Path ".venv-clone\Scripts\python.exe")
   }
 }
@@ -376,40 +380,75 @@ function DoClone($s) {
     Say "  .venv-clone already exists - leaving it alone." "Green"
     return
   }
-  if (-not $s.Py312) {
-    Record "cloned voice" "blocked" "no reachable Python 3.12"
-    Say "  Needs Python 3.12 exactly - torch 2.6.0 has no wheels for 3.13+." "Red"
-    Say "  No 3.12 found: not on the py launcher, not on PATH, not under uv," "Red"
-    Say "  and not in the usual install folders. Install one with:" "Red"
+  if (-not $s.ClonePy) {
+    Record "cloned voice" "blocked" "no Python 3.10 or newer"
+    Say "  Needs Python 3.10 or newer. None found: not on the py launcher," "Red"
+    Say "  not on PATH, not under uv, and not in the usual install folders." "Red"
     Say "    winget install --id Python.Python.3.12 --exact" "Red"
     Say "  If you already have one, pass its full path in config.json as" "Red"
     Say "  clonedVoice.python and run this again." "Red"
     return
   }
   if ($DryRun) {
-    Say "  would create .venv-clone on $($s.Py312), then install torch 2.6.0+cu126, then chatterbox-tts" "Cyan"
+    Say "  would create .venv-clone on $($s.ClonePy), then install a CUDA torch, then chatterbox-tts" "Cyan"
     Record "cloned voice" "planned" "venv + torch cu126 + chatterbox"
     return
   }
-  if ($s.CloneVenv) { Record "cloned voice" "already" ".venv-clone exists"; Say "  .venv-clone already exists - leaving it alone." "Green"; return }
 
-  Say "  creating .venv-clone ..." "Cyan"
-  & py -3.12 -m venv .venv-clone
+  Say "  creating .venv-clone on $($s.ClonePy) ..." "Cyan"
+  $pyParts = $s.ClonePy.Split(" ")
+  if ($pyParts.Count -gt 1) { & $pyParts[0] $pyParts[1] -m venv .venv-clone }
+  else { & $s.ClonePy -m venv .venv-clone }
   if ($LASTEXITCODE -ne 0) { Record "cloned voice" "failed" "venv creation"; Say "  venv creation FAILED." "Red"; return }
 
   $vpy = ".venv-clone\Scripts\python.exe"
+
+  # setuptools BEFORE anything else, and pinned.
+  #
+  # resemble-perth - which chatterbox loads to watermark its output - does
+  # `from pkg_resources import resource_filename`, and pkg_resources was REMOVED
+  # in setuptools 81. A fresh install today gets setuptools 84, so perth's import
+  # fails, its package __init__ swallows the ImportError and leaves
+  # PerthImplicitWatermarker as None, and chatterbox dies on
+  # `TypeError: 'NoneType' object is not callable` - naming neither setuptools
+  # nor pkg_resources.
+  #
+  # This is not a Python-version problem and it is not new to 3.14. The venv on
+  # this machine works only because it was built when setuptools was 78. Every
+  # install after setuptools 81 shipped was broken, on every Python.
+  Say "  pinning setuptools below 81 (perth still imports pkg_resources) ..." "Cyan"
+  & $vpy -m pip install "setuptools<81"
+  if ($LASTEXITCODE -ne 0) { Record "cloned voice" "failed" "setuptools"; Say "  setuptools FAILED." "Red"; return }
+
   # torch FIRST, from PyTorch's own index. Installing chatterbox-tts plainly
-  # resolves torch==2.6.0 from PyPI, whose Windows wheel is CPU-ONLY, and it
-  # replaces a working CUDA torch silently. 2.6.0+cu126 satisfies the same pin,
-  # so chatterbox then installs on top without touching it. CLAUDE.md records
+  # resolves torch from PyPI, whose Windows wheel is CPU-ONLY, and it replaces a
+  # working CUDA torch silently. A +cu126 build satisfies the same pin, so
+  # chatterbox then installs on top without touching it. CLAUDE.md records
   # 2.6 GB thrown away learning this.
-  Say "  installing torch 2.6.0+cu126 (2.6 GB, from PyTorch's index) ..." "Cyan"
-  & $vpy -m pip install "torch==2.6.0" --index-url "https://download.pytorch.org/whl/cu126"
+  #
+  # Which torch depends on the Python: chatterbox asks for ==2.6.0 below 3.14
+  # and >=2.9.0 at 3.14 and above, and there is no 2.6.0 wheel for cp314.
+  $minor = & $vpy -c "import sys; print(sys.version_info.minor)"
+  $torchSpec = if ([int]$minor -ge 14) { "torch>=2.9.0" } else { "torch==2.6.0" }
+  Say "  installing $torchSpec from PyTorch's CUDA index (about 2.6 GB) ..." "Cyan"
+  & $vpy -m pip install $torchSpec --index-url "https://download.pytorch.org/whl/cu126"
   if ($LASTEXITCODE -ne 0) { Record "cloned voice" "failed" "torch"; Say "  torch FAILED." "Red"; return }
 
   Say "  installing chatterbox-tts ..." "Cyan"
   & $vpy -m pip install chatterbox-tts
   if ($LASTEXITCODE -ne 0) { Record "cloned voice" "failed" "chatterbox"; Say "  chatterbox FAILED." "Red"; return }
+
+  # chatterbox depends on setuptools and pip may have pulled a new one back in
+  # while resolving it. Re-pin and verify, because the failure this prevents is
+  # silent until the first time somebody tries to speak.
+  & $vpy -m pip install --quiet "setuptools<81"
+  $ok = & $vpy -c "import perth; print(perth.PerthImplicitWatermarker is not None)" 2>$null
+  if ($ok -notmatch "True") {
+    Record "cloned voice" "failed" "perth watermarker unavailable"
+    Say "  Installed, but perth's watermarker did not load - the cloned voice would" "Red"
+    Say "  fail at startup. Usually setuptools 81+ removing pkg_resources." "Red"
+    return
+  }
 
   Record "cloned voice" "installed" ".venv-clone"
   Say "  cloned voice installed. It still needs voices/greg-reference.wav." "Green"
@@ -500,14 +539,13 @@ if ($Minimal) {
 # only one that did not.
 #
 # Still defaults to NO, and -All still skips it. That part was deliberate and
-# stays: it is 6 GB, it needs Python 3.12 exactly, and it cannot finish without a
-# voice recording the user has to supply. Offering it is different from
-# assuming it.
+# stays: it is 6 GB and it cannot finish without a voice recording the user has
+# to supply. Offering it is different from assuming it.
 if ($Clone) {
   DoClone $survey
 } elseif ($Minimal) {
   Record "cloned voice" "skipped" "-Minimal"
-} elseif (Ask "Clone a real person's voice? Needs Python 3.12 and a recording you supply" "6 GB" $false) {
+} elseif (Ask "Clone a real person's voice? Needs a recording you supply" "6 GB" $false) {
   DoClone $survey
 } else {
   Record "cloned voice" "skipped" "declined"

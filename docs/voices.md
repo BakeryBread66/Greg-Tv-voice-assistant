@@ -30,17 +30,32 @@ of clearly at startup.
 .\setup-greg.ps1 -Clone
 ```
 
-It is **off by default even under `-All`**. It is about 6 GB, and it needs
-**Python 3.12 specifically** — the clone pins `torch==2.6.0`, which has no
-wheels for newer Pythons. Run `.\setup-greg.ps1 -DryRun -Clone` first to see the
-plan without changing anything.
+It is **off by default even under `-All`** and is about 6 GB. Run
+`.\setup-greg.ps1 -DryRun -Clone` first to see the plan without changing
+anything.
 
-There is a trap in that install worth knowing about even though the script
-handles it: installing `chatterbox-tts` plainly resolves `torch==2.6.0` from
-PyPI, and **the Windows PyPI wheel is CPU-only** — it silently replaces a working
-CUDA torch and the clone then runs on the processor. Torch must come from the
-CUDA index first; `2.6.0+cu126` satisfies the pin, so chatterbox installs on top
-without touching it.
+**Any Python from 3.10 to 3.14 works** — the setup uses whichever one Whisper
+and Piper already run on. An older version of this page said 3.12 exactly, which
+was true when `chatterbox-tts` pinned `torch==2.6.0` for everything. It now asks
+for `torch>=2.9.0` at 3.14 and above, and PyTorch ships CUDA wheels from cp39 to
+cp314. Tested end to end on 3.14.4 with torch 2.13.0+cu126.
+
+**One pin that is not optional: `setuptools<81`.** `resemble-perth`, which
+chatterbox loads to watermark its output, still does
+`from pkg_resources import resource_filename` — and `pkg_resources` was removed
+in setuptools 81. Its package `__init__` swallows the resulting ImportError and
+leaves the watermarker as `None`, so chatterbox dies later on
+`TypeError: 'NoneType' object is not callable`, naming neither setuptools nor
+pkg_resources. The setup pins it and then checks the watermarker actually
+loaded, because that failure is invisible until the first time Greg tries to
+speak.
+
+There is a second trap the script also handles: installing `chatterbox-tts`
+plainly resolves torch from PyPI, and **the Windows PyPI wheel is CPU-only** — it
+silently replaces a working CUDA torch and the clone then runs on the processor,
+perhaps thirty times slower, with nothing reporting a fault. Torch is installed
+first from PyTorch's own CUDA index; a `+cu126` build satisfies chatterbox's pin
+either way, so it installs on top without touching it.
 
 ### 2. Record about ten seconds
 
@@ -210,6 +225,7 @@ reports what actually loaded rather than what was configured.
 | Console says the clone is "disabled in config" | the key is `clonedVoice`, **not** `clone` — a whole day was lost to that once |
 | Clone never loads, no error | no Python 3.12; check `.venv-clone\Scripts\python.exe` exists |
 | It runs but is very slow | CPU-only torch — reinstall from the CUDA index |
+| `'NoneType' object is not callable` | setuptools 81+ removed pkg_resources; pin `setuptools<81` |
 | A new `.onnx` is ignored | its `.onnx.json` is missing |
 | "that clip is N minutes long" | the reference is untrimmed — see the table above |
 | `exited (null)` on an older build | the same thing, before it was checked for. Trim the clip |
