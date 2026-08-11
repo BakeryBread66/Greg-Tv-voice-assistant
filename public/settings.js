@@ -165,6 +165,7 @@ export function paintSettings(state) {
   $("set-mirror").checked = p.mirror !== false;
   $("set-style").value = p.style ?? "";
   paintPersonas(state.personas);
+  paintVoices(state.voices, state.currentVoice, state.clone);
   paintDesktop(state.appearance?.background ?? "#008080");
 
   $("set-subtitles").value = state.subtitles ?? "auto";
@@ -272,6 +273,79 @@ function paintPersonas(personas) {
     note.textContent = select.value
       ? `${chosen.dataset.description || ""} Applying this sets the name and all six dials.`.trim()
       : "Pick a character to change his name, what he thinks he is, and every dial at once.";
+  };
+  select.onchange = describe;
+  describe();
+}
+
+/**
+ * The voice list, from the same folder listing the server reads.
+ *
+ * Unlike the character dropdown this one CAN honestly show what is selected —
+ * a voice has exactly one answer, where "which persona did these dials come
+ * from" has none once you have moved a slider.
+ *
+ * Two things it must be straight about, both of which a naive dropdown gets
+ * wrong by omission:
+ *
+ *   - A cloned voice takes about 45 seconds and he keeps talking in the old one
+ *     meanwhile. Applying and hearing no change is indistinguishable from a
+ *     broken control unless it says so first.
+ *   - Cloned voices can be listed and unusable — switched off in config, parked
+ *     by gaming mode, or the sidecar never started. Offering them without
+ *     saying that is a menu where half the entries silently do nothing.
+ */
+function paintVoices(voices, current, clone) {
+  const select = $("set-voice");
+  const note = $("set-voice-note");
+  if (!select) return;
+
+  const list = voices ?? [];
+  const cloneBlocked = clone && clone.ready === false;
+
+  select.innerHTML = `<option value="">Keep as is</option>`;
+  for (const voice of list) {
+    const option = document.createElement("option");
+    option.value = voice.id;
+    // The kind matters to the person choosing: one is a real person's voice and
+    // slow to load, the other is instant. Saying which is not decoration.
+    const isClone = voice.kind === "clone";
+    option.textContent = `${voice.label}${isClone ? " — cloned" : ""}${voice.id === current ? " (current)" : ""}`;
+    option.dataset.kind = voice.kind;
+    // Left selectable on purpose even when blocked. The choice is still SAVED,
+    // which is what makes "turn gaming mode off and it will load" a delay
+    // rather than a dead end — so disabling it would remove a working path.
+    if (isClone && cloneBlocked) option.textContent += " — unavailable";
+    select.appendChild(option);
+  }
+
+  if (!list.length) {
+    select.innerHTML = `<option value="">No voices found</option>`;
+  }
+
+  const describe = () => {
+    const chosen = select.selectedOptions[0];
+    const kind = chosen?.dataset.kind;
+
+    if (!list.length) {
+      note.textContent = "Nothing in the voices folder yet. Greg downloads one on his first run.";
+      return;
+    }
+    if (!select.value) {
+      note.textContent = cloneBlocked
+        ? `Leave it as it is. Note: ${clone.fix}`
+        : "Pick a voice. Drop a .wav in the voices folder to clone somebody from about ten seconds of recording.";
+      return;
+    }
+    if (kind === "clone" && cloneBlocked) {
+      // The choice is saved either way; say what is actually true.
+      note.textContent = `This will be saved, but he will not change voice yet. ${clone.fix}`;
+      return;
+    }
+    note.textContent =
+      kind === "clone"
+        ? "A cloned voice takes about 45 seconds to load. He keeps talking in his current voice until it is ready."
+        : "This one loads in about a second, so it applies to the next thing he says.";
   };
   select.onchange = describe;
   describe();
@@ -430,6 +504,11 @@ function collect() {
     // are still showing the person he is now rather than the one being chosen.
     appearance: { background: $("set-bg")?.value ?? "#008080" },
     persona: $("set-persona")?.value ?? "",
+    // Empty means "leave the voice alone", same as the character box. A persona
+    // in the same patch WINS over this — resolved at the top of applySettings —
+    // because picking a character and a voice at once should give you the
+    // character's voice, not a hybrid of the two.
+    voice: $("set-voice")?.value ?? "",
     volume: Number($("set-volume").value) / 100,
     subtitles: $("set-subtitles").value,
     vocoder: {

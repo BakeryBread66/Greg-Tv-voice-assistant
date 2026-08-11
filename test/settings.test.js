@@ -412,3 +412,71 @@ test("subtitles take one of three modes and refuse anything else", async () => {
   assert.equal(bad.problems.length, 1);
   assert.match(bad.problems[0], /auto, always, off/);
 });
+
+// ---------------------------------------------------------------------------
+// Why a cloned voice would not work, said BEFORE anyone picks one
+//
+// The Settings dialog lists every voice on the machine, and a cloned one can be
+// listed and unusable for three different reasons that live in three different
+// places: config says whether it is switched on, power.js says whether gaming
+// mode has it parked, and only the sidecar knows the venv was never created.
+// A dropdown offering entries that silently do nothing is the shape of failure
+// this project exists to remove.
+//
+// Pure, so none of this spawns the 4 GB model — the same reason cloneAction was
+// split out after a test walked past both guards and started loading one.
+// ---------------------------------------------------------------------------
+
+test("a cloned voice that cannot work says which of the three reasons it is", async () => {
+  const { cloneAvailability } = await import("../lib/voices.js");
+
+  // Never set up at all: no clonedVoice block. Distinct from switched off,
+  // because the fix is a different command.
+  const missing = cloneAvailability({});
+  assert.equal(missing.ready, false);
+  assert.match(missing.fix, /setup-greg\.ps1 -Clone/, "name the command that fixes it");
+
+  // Present but switched off.
+  const off = cloneAvailability({ clonedVoice: { enabled: false } });
+  assert.equal(off.ready, false);
+  assert.match(off.fix, /clonedVoice\.enabled/);
+  assert.match(off.fix, /restart/, "this one does need a restart, unlike the others");
+
+  // Parked by gaming mode. Loading it here would quietly take back the ~4 GB
+  // that mode exists to free, so it is refused rather than done.
+  const parked = cloneAvailability({ clonedVoice: { enabled: true } }, { cloneWanted: false });
+  assert.equal(parked.ready, false);
+  assert.match(parked.fix, /gaming mode/i);
+
+  // The likeliest real failure, and the only one config cannot see: enabled,
+  // wanted, and the sidecar never started because there is no Python 3.12.
+  const dead = cloneAvailability(
+    { clonedVoice: { enabled: true } },
+    { cloneWanted: true, runtime: "unavailable", reason: "no Python at .venv-clone" }
+  );
+  assert.equal(dead.ready, false);
+  assert.match(dead.fix, /no Python/, "carry the sidecar's own reason, which names the missing piece");
+
+  // All clear.
+  const fine = cloneAvailability(
+    { clonedVoice: { enabled: true } },
+    { cloneWanted: true, runtime: "ready" }
+  );
+  assert.deepEqual(fine, { ready: true, fix: "" });
+});
+
+test("the dialog is told which voice is loaded, and every voice available", async () => {
+  // The voice dropdown can honestly show what is selected, where the character
+  // dropdown cannot — dials can be moved after a persona is picked, so "which
+  // character are you" has no reliable answer. A voice has exactly one.
+  const state = settingsState();
+
+  assert.ok(Array.isArray(state.voices), "the dialog builds its list from this");
+  assert.ok("currentVoice" in state, "and marks the one in use");
+  assert.ok(state.clone && typeof state.clone.ready === "boolean", "and knows whether a clone would work");
+
+  for (const voice of state.voices) {
+    assert.ok(voice.id && voice.label, "a voice needs an id and something to show");
+    assert.ok(["clone", "piper"].includes(voice.kind), `${voice.id}: kind decides the 45-second warning`);
+  }
+});
