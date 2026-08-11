@@ -18,11 +18,11 @@
   "author": "BakeryBread66",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/BakeryBread66/Greg-For-Windows.git"
+    "url": "git+https://github.com/BakeryBread66/Greg-Tv-voice-assistant.git"
   },
-  "homepage": "https://github.com/BakeryBread66/Greg-For-Windows#readme",
+  "homepage": "https://github.com/BakeryBread66/Greg-Tv-voice-assistant#readme",
   "bugs": {
-    "url": "https://github.com/BakeryBread66/Greg-For-Windows/issues"
+    "url": "https://github.com/BakeryBread66/Greg-Tv-voice-assistant/issues"
   },
   "scripts": {
     "start": "node server.js",

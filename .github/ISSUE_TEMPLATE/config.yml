@@ -4,17 +4,17 @@
 blank_issues_enabled: true
 contact_links:
   - name: A security problem
-    url: https://github.com/BakeryBread66/Greg-For-Windows/security/advisories/new
+    url: https://github.com/BakeryBread66/Greg-Tv-voice-assistant/security/advisories/new
     about: >
       Report it privately instead. Anything that could let someone reach another
       person's files, screen, microphone or conversation log should not be a
       public issue until there is a fix. See SECURITY.md.
   - name: Settings that look wasteful but are not
-    url: https://github.com/BakeryBread66/Greg-For-Windows/blob/main/DECISIONS.md
+    url: https://github.com/BakeryBread66/Greg-Tv-voice-assistant/blob/main/DECISIONS.md
     about: >
       Thinking, the context window, which model, why the local voice is not the
       fast one. Each with the measurement that settled it — worth a look before
       reporting one as a bug.
   - name: When something is off
-    url: https://github.com/BakeryBread66/Greg-For-Windows/blob/main/docs/troubleshooting.md
+    url: https://github.com/BakeryBread66/Greg-Tv-voice-assistant/blob/main/docs/troubleshooting.md
     about: The common failures and what each one actually means.
