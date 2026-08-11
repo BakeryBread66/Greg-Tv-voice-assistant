@@ -1186,6 +1186,43 @@ test("muting him turns the subtitles on, and 'off' is a choice rather than an ac
   assert.equal(subtitlesFor("no thanks", 0), true, "an unrecognised mode falls back to auto");
 });
 
+test("the subtitle walks through a clip that holds several sentences", async () => {
+  const { sentenceAt } = await import("../public/subtitles.js");
+
+  // Sentences 2..N of a reply are now synthesized as ONE call so Piper picks
+  // its own pauses. That removed the seam the subtitles used to sit on: one
+  // clip would otherwise mean one subtitle for the whole remainder, clipped at
+  // four lines — and on a muted set that is the only copy of the answer.
+  const three = ["Aaaa.", "Bbbb.", "Cccc."]; // equal length, so thirds
+
+  assert.equal(sentenceAt(three, 0), "Aaaa.");
+  assert.equal(sentenceAt(three, 0.5), "Bbbb.");
+  assert.equal(sentenceAt(three, 0.9), "Cccc.");
+  assert.equal(sentenceAt(three, 1), "Cccc.", "the end of the clip is the last sentence, not past it");
+
+  // Weighted by length: a long first sentence holds the subtitle longer, which
+  // is the whole approximation — a TTS voice reads at a roughly constant rate.
+  const uneven = ["A".repeat(90), "B".repeat(10)];
+  assert.equal(sentenceAt(uneven, 0.5)[0], "A", "halfway through is still inside the long one");
+  assert.equal(sentenceAt(uneven, 0.95)[0], "B");
+
+  // Absence before conversion. Number(null) and Number("") are both 0, which is
+  // a valid progress — so an unguarded version pins the subtitle to sentence one
+  // for the whole clip and nothing looks wrong. Eighth place this could bite.
+  for (const bad of [null, undefined, "", NaN, "half", {}]) {
+    assert.equal(sentenceAt(three, bad), "Aaaa.", `progress ${JSON.stringify(bad)} falls back to the start`);
+  }
+  assert.equal(sentenceAt(three, -1), "Aaaa.", "clamped, not wrapped");
+  assert.equal(sentenceAt(three, 5), "Cccc.");
+
+  // Nothing to show is null rather than a crash or an empty string: the caller
+  // passes it straight to face.setSpeech.
+  assert.equal(sentenceAt([], 0.5), null);
+  assert.equal(sentenceAt(null, 0.5), null);
+  assert.equal(sentenceAt(["  ", ""], 0.5), null, "blank sentences are not sentences");
+  assert.equal(sentenceAt(["Only one."], 0.7), "Only one.");
+});
+
 test("a subtitle wraps to the grid and says when it has been cut", async () => {
   const { subtitleLines } = await import("../public/subtitles.js");
 

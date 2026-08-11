@@ -33,6 +33,51 @@ export function subtitlesFor(mode, volume) {
 }
 
 /**
+ * Which sentence of a multi-sentence clip is being spoken, as a fraction of the
+ * way through it.
+ *
+ * Sentences 2..N of a reply are synthesized as ONE call so Piper picks its own
+ * pauses — see the chunking note in CLAUDE.md. That gives better prosody and
+ * takes away the seam the subtitles used to sit on: one clip would mean one
+ * subtitle for the whole remainder, which clips at four lines and on a muted set
+ * is the only copy of the answer.
+ *
+ * So the subtitle is advanced through the clip instead, weighted by characters.
+ * That is an approximation — it assumes a roughly constant speaking rate, which
+ * is true enough of a TTS voice reading one passage and would not be of a person
+ * — and it is a far better one than showing a quarter of the answer. Nothing
+ * depends on it being exact: being a word late changes nothing, and the words
+ * are all on screen either way.
+ *
+ * Deliberately NOT clock-based. A timer would drift against the audio the moment
+ * anything stalled, and would keep running after an interruption.
+ */
+export function sentenceAt(sentences, progress) {
+  const list = (sentences ?? []).filter((s) => String(s ?? "").trim());
+  if (!list.length) return null;
+  if (list.length === 1) return list[0];
+
+  // Absence before conversion: Number(null) and Number("") are both 0, which is
+  // a perfectly valid progress and would silently pin the subtitle to the first
+  // sentence for the whole clip. Number(null) has bitten this project seven
+  // times; this is the eighth place it could have.
+  const fraction = Number.isFinite(Number(progress)) ? Math.min(1, Math.max(0, Number(progress))) : 0;
+
+  const lengths = list.map((s) => s.trim().length);
+  const total = lengths.reduce((a, b) => a + b, 0);
+  if (!total) return list[0];
+
+  let seen = 0;
+  for (let i = 0; i < list.length; i++) {
+    seen += lengths[i];
+    // Strictly less-than, so a progress of exactly 1 lands on the last sentence
+    // rather than falling off the end.
+    if (fraction < seen / total) return list[i];
+  }
+  return list[list.length - 1];
+}
+
+/**
  * A sentence as up to `maxLines` lines of at most `maxChars`.
  *
  * Character-counted, not measured in pixels, because the subtitle is drawn in

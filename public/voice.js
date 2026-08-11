@@ -10,6 +10,7 @@ import { initSettings, paintSettings } from "./settings.js";
 import { normalize, afterWakeWord as matchWakeWord, isFiller, isCancel, isReplay } from "./wake.js";
 import { createVocoder } from "./vocoder.js";
 import { clampVolume, stepVolume, volumeLabel } from "./volume.js";
+import { sentenceAt } from "./subtitles.js";
 import { playEarcon, playStrike, playPost, tubeWhine } from "./earcon.js";
 import { micProblem as micProblemFor, hasAddressBar } from "./mic-help.js";
 
@@ -905,16 +906,41 @@ async function ask(text) {
     });
     if (!res.ok || !res.body) throw new Error(`server error ${res.status}`);
 
+    // Sentence one is synthesized alone; the rest are held and sent as ONE call.
+    //
+    // Piper phrases a passage better than we can. Given the whole thing it picks
+    // a short break at a comma and a long one at a full stop — measured pause
+    // structure [70, 200] — where feeding it a sentence at a time and inserting
+    // SENTENCE_GAP_MS gives [110, 110], identical every time. We were
+    // overwriting its judgement with a constant, and phrasing is the single
+    // thing that most makes a synthesized voice sound like a machine: the same
+    // passage takes one pause from Piper per sentence, five from the clone, and
+    // twelve from the human it was cloned from.
+    //
+    // Splitting it this way keeps both halves. The streaming win is ENTIRELY
+    // time-to-first-sound, and that is bought by sentence one; everything after
+    // it is covered by sentence one still playing. It costs nothing to wait for
+    // the rest because a turn that calls a tool emits no content at all until
+    // the final round — so once text starts arriving, all of it arrives.
+    const rest = [];
+
     for await (const event of readEvents(res.body)) {
       if (abandoned()) return; // you cut in; this answer is no longer wanted
       if (event.type === "sentence") {
         // Say it and show it as it lands, rather than waiting for the full answer.
         heard.push(event.text);
         showGreg(heard.join(" "));
-        spoken.push(speak(event.text));
+        if (heard.length === 1) spoken.push(speak(event.text));
+        else rest.push(event.text);
       } else if (event.type === "done") {
         reply = event.reply ?? heard.join(" ");
       }
+    }
+
+    // Inside the try on purpose: a stream that failed part-way must say the
+    // failure rather than speak the fragment it managed to collect.
+    if (rest.length && !abandoned()) {
+      spoken.push(speak(rest.join(" "), { sentences: rest }));
     }
   } catch (err) {
     // Interrupting aborts the request, which lands here. That isn't a failure and
@@ -1000,13 +1026,19 @@ function primeSpeech() {
   }
 }
 
-/** Queue one sentence. Resolves when it has finished playing (or been cut off). */
-function speak(text) {
+/**
+ * Queue one clip. Resolves when it has finished playing (or been cut off).
+ *
+ * `sentences` is what the clip contains, when it is more than one — the
+ * subtitle is advanced through them as it plays. Synthesizing sentences 2..N
+ * together is what lets Piper choose its own pauses; see ask().
+ */
+function speak(text, { sentences = null } = {}) {
   const clean = String(text ?? "").trim();
   if (!clean) return Promise.resolve();
 
   return new Promise((resolve) => {
-    speech.items.push({ text: clean, audio: null, done: resolve });
+    speech.items.push({ text: clean, sentences, audio: null, done: resolve });
     primeSpeech();
     drainSpeech();
   });
@@ -1062,12 +1094,14 @@ async function drainSpeech() {
         if (replayClips.length > 12) replayClips.shift();
       }
 
-      // Page 888. Set per sentence, which is the seam that already existed —
-      // and set for BOTH paths, because the browser's own voice is the one most
-      // likely to be missing something worth reading.
-      face.setSpeech?.(item.text);
+      // Page 888. One clip can now hold several sentences — 2..N are
+      // synthesized together so Piper picks its own pauses — so the subtitle is
+      // advanced through them during playback rather than set once. Set for
+      // BOTH paths, because the browser's own voice is the one most likely to
+      // be missing something worth reading.
+      face.setSpeech?.(item.sentences?.[0] ?? item.text);
 
-      if (blob) await playClip(blob);
+      if (blob) await playClip(blob, item.sentences);
       else await browserSpeak(item.text);
       item.done();
 
@@ -1086,7 +1120,7 @@ async function drainSpeech() {
   }
 }
 
-function playClip(blob) {
+function playClip(blob, sentences = null) {
   const url = URL.createObjectURL(blob);
   // Marks the start of the whole run of speech, not this one sentence — the
   // runaway guard below asks "did he barely get going before being cut off?",
@@ -1099,6 +1133,19 @@ function playClip(blob) {
   // mode is "speaking".
   if (bargeInReady()) localListener.enable();
 
+  // Walk the subtitle through a clip that holds more than one sentence. Driven
+  // off the audio's own position rather than a timer, so it cannot drift away
+  // from what is being said and stops dead when he is interrupted.
+  const trackSubtitle =
+    sentences?.length > 1
+      ? () => {
+          const { currentTime, duration } = player;
+          if (!Number.isFinite(duration) || duration <= 0) return;
+          face.setSpeech?.(sentenceAt(sentences, currentTime / duration));
+        }
+      : null;
+  if (trackSubtitle) player.addEventListener("timeupdate", trackSubtitle);
+
   return new Promise((resolve) => {
     // Held so an interruption can cut the sentence short without hanging here.
     endSpeech = resolve;
@@ -1108,6 +1155,7 @@ function playClip(blob) {
     player.play().catch(resolve);
   }).then(() => {
     endSpeech = null;
+    if (trackSubtitle) player.removeEventListener("timeupdate", trackSubtitle);
     URL.revokeObjectURL(url);
   });
 }
