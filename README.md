@@ -52,21 +52,25 @@ Measured, resident, on a 24 GB card:
 | | |
 | --- | ---: |
 | Brain (`gemma4:e4b`) | 3.4 GB |
-| Ears (Whisper) | ~1 GB |
+| Ears (Whisper) | ~1 GB, or none on the CPU |
 | Eyes (`qwen2.5vl:7b`) | 5.9 GB |
-| Cloned voice | 5.4 GB |
+| Cloned voice | ~4.0 GB |
 
-So **~6 GB** runs the brain and ears comfortably and **~12 GB** adds the eyes.
-The **cloned voice wants about 16 GB** to sit alongside the rest — and on **8 GB
-it does not fit at all**, even with the eyes switched off, because the brain and
-the clone alone come to 8.8 GB. Piper is the answer on a smaller card and it is
-a good one: it runs on the CPU, uses no video memory, and is nine times faster
-than realtime.
+So **~6 GB** runs the brain and ears comfortably, **~12 GB** adds the eyes, and
+**~16 GB** holds all four at once.
 
-Running the clone on the CPU instead (`clonedVoice.device`) does work, and is
-too slow to talk to — measured at **3.7x realtime**, about twelve seconds before
-he starts a one-sentence reply. An NPU does not help either: it has no memory of
-its own to lend, and none of the four engines can target one.
+**On 8 GB the cloned voice is possible but tight.** The brain and the clone come
+to about 7.4 GB before Windows takes its share of the card for the desktop, so
+it wants the eyes switched off and the ears moved to the processor
+(`"speech": { "device": "cpu" }`, where Whisper is perfectly usable). If it still
+runs out, a smaller chat model is the lever — but that trades the conversation
+for the voice, and Piper is the better trade: it runs on the CPU, uses no video
+memory at all, and is nine times faster than realtime.
+
+Running the clone itself on the CPU (`clonedVoice.device`) works and is too slow
+to talk to — measured at **3.7x realtime**, about twelve seconds before he starts
+a one-sentence reply. An NPU does not help either: it has no memory of its own to
+lend, and none of the four engines can target one.
 
 ## Setting him up
 
