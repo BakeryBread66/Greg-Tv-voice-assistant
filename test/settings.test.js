@@ -314,10 +314,28 @@ test("asking for a voice this machine does not have says so", async () => {
 });
 
 test("asking for the voice already loaded does nothing", async () => {
+  // Tested at planVoiceChange, where `current` is a parameter, because that is
+  // the only place "loaded" can be stated rather than inferred. applySettings
+  // reads it from the live sidecars, and no sidecar runs in a test — which is
+  // the whole point of the pair below.
+  const { planVoiceChange } = await import("../lib/voices.js");
+  const plan = planVoiceChange("ryan", { current: { piperVoice: "en_US-ryan-high" } });
+  if (plan.missing) return; // no voices on this machine
+
+  assert.equal(plan.change, false, "no needless sidecar restart when it really is loaded");
+  assert.equal(plan.reason, "already using it");
+});
+
+test("but a voice config NAMES and has not loaded is retried", async () => {
+  // The bug this pair exists for. The reference or voice name is saved to config
+  // unconditionally, before the sidecar is asked to start — so config naming it
+  // proves nothing about whether it works. Deciding "already using it" from
+  // config meant a voice that had failed to load could never be picked again:
+  // the dropdown returned ok, changed nothing, and said nothing.
   config.localVoice = { voice: "en_US-ryan-high" };
   const result = await applySettings({ voice: "ryan" });
   assert.equal(result.ok, true);
-  assert.deepEqual(voiceCalls, [], "no needless sidecar restart");
+  assert.deepEqual(voiceCalls, ["en_US-ryan-high"], "not loaded, so it must actually try");
 });
 
 test("a voice can be named loosely, and ambiguity is refused", async () => {
@@ -634,4 +652,55 @@ test("a CUDA failure is reported as what to do, not as torch's debugging advice"
 
   // Falls back to the last line when there is no exception to find.
   assert.equal(usefulError("just some noise\nand a final line"), "and a final line");
+});
+
+// ---------------------------------------------------------------------------
+// Re-picking a voice that failed to load must RETRY, not shrug
+//
+// planVoiceChange short-circuits on "already using it". It decided that from
+// config — and the reference is SAVED unconditionally, before the sidecar is
+// even asked to start. So once a clone had failed to load, picking that same
+// voice again returned change:false, applySettings never called the switcher,
+// and the dropdown silently did nothing. The one state where retrying is the
+// entire point was the one state that refused to try.
+//
+// Reported as "he still cannot get Greg to use his trimmed voice", after the
+// clip and the install had both been fixed.
+// ---------------------------------------------------------------------------
+
+test("a voice named in config but not loaded is not 'already using it'", async () => {
+  const { planVoiceChange } = await import("../lib/voices.js");
+
+  // Nothing is running in this process — no sidecar was ever started — so the
+  // clone is not loaded no matter what config says.
+  const config = { clonedVoice: { enabled: true, reference: "voices/greg-reference.wav" } };
+  const { currentVoice } = await import("../lib/voices.js");
+  const now = currentVoice(config);
+
+  assert.equal(now.cloneReference, null, "nothing is loaded, so nothing is current");
+  assert.equal(now.wantedClone, "voices/greg-reference.wav", "but config still says what it wants");
+
+  // The real folder is used here deliberately: greg-reference.wav is the one
+  // voice this repo's own config points at. Skipped if the machine has no
+  // voices, since voices/ is gitignored and empty on a fresh clone.
+  const plan = planVoiceChange("greg", { current: now });
+  if (plan.missing) return; // no voices on this machine; nothing to assert
+
+  assert.equal(plan.change, true, "a voice that is not loaded must be switched TO, not skipped");
+  assert.notEqual(plan.reason, "already using it");
+});
+
+test("the dialog can say which voice is loaded", async () => {
+  // settingsState asked for `currentVoice(config)?.id` — an object with no id —
+  // so the "(current)" marker never appeared once. `undefined ?? null` is a
+  // perfectly good "nothing selected", which is why it was silent.
+  const { loadedVoiceId } = await import("../lib/voices.js");
+
+  // Nothing loaded in this process, so null rather than whatever config names.
+  assert.equal(loadedVoiceId({ clonedVoice: { reference: "voices/greg-reference.wav" } }), null);
+  assert.equal(loadedVoiceId({}), null);
+
+  // And it is exported, which is what settingsState needs. The previous version
+  // failed by reading a property that did not exist rather than by throwing.
+  assert.equal(typeof loadedVoiceId, "function");
 });

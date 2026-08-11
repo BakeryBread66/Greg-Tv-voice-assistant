@@ -969,11 +969,18 @@ test("the clone reference is read from clonedVoice, the key that is actually con
   // so a swap set a field into space and the sidecar reported "disabled in
   // config". Guessed rather than checked against the file that consumes it.
   const { currentVoice } = await import("../lib/voices.js");
+
+  // `wantedClone` is the field that reads config. `cloneReference` is what is
+  // actually LOADED and is null here because no sidecar runs in a test — that
+  // separation is the fix for a different bug, where config naming a voice was
+  // taken as proof it was working, so a clone that had failed could never be
+  // retried from the dialog.
   assert.equal(
-    currentVoice({ clonedVoice: { reference: "voices/x.wav" } }).cloneReference,
+    currentVoice({ clonedVoice: { reference: "voices/x.wav" } }).wantedClone,
     "voices/x.wav",
   );
-  assert.equal(currentVoice({ clone: { reference: "voices/wrong.wav" } }).cloneReference, null);
+  assert.equal(currentVoice({ clone: { reference: "voices/wrong.wav" } }).wantedClone, null);
+  assert.equal(currentVoice({ clonedVoice: { reference: "voices/x.wav" } }).cloneReference, null);
 });
 
 // ---------------------------------------------------------------------------
