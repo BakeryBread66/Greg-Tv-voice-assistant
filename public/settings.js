@@ -332,8 +332,12 @@ function paintVoices(voices, current, clone) {
       return;
     }
     if (!select.value) {
+      // The blocked case leads with the PROBLEM, not with "leave it as it is".
+      // Reported by somebody who had just added a voice and was told to leave
+      // things alone, with the actual fault trailing after a "Note:" — advice
+      // about the dropdown where they needed the reason their voice failed.
       note.textContent = cloneBlocked
-        ? `Leave it as it is. Note: ${clone.fix}`
+        ? `Cloned voices are unavailable. ${clone.fix}`
         : "Pick a voice. Drop a .wav in the voices folder to clone somebody from about ten seconds of recording.";
       return;
     }

@@ -480,3 +480,90 @@ test("the dialog is told which voice is loaded, and every voice available", asyn
     assert.ok(["clone", "piper"].includes(voice.kind), `${voice.id}: kind decides the 45-second warning`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// The reference clip, checked before a 4 GB model is loaded
+//
+// Reported by a user who dropped half an hour of game dialogue into voices/ and
+// pointed config at it. Chatterbox is handed audio_prompt_path on EVERY
+// generation, including the warm-up before the sidecar reports READY, so the
+// whole file is decoded each time — 30 minutes of 48 kHz stereo is ~700 MB as
+// float32 on top of the model. The process was killed on a signal and Node
+// reported `exited (null)`, which names neither the file nor the cause.
+//
+// Reading a WAV header costs a few bytes. The alternative is a model load that
+// ends in an OOM kill.
+// ---------------------------------------------------------------------------
+
+/** A WAV header describing `seconds` of audio, without the audio. */
+function wavHeader({ seconds, rate = 24000, channels = 1, bits = 16, extraChunk = false }) {
+  const dataBytes = Math.round(seconds * rate * channels * (bits / 8));
+  const pre = extraChunk ? 8 + 4 : 0; // a LIST chunk before data, as many encoders write
+  const head = Buffer.alloc(44 + pre);
+  head.write("RIFF", 0);
+  head.writeUInt32LE(36 + pre + dataBytes, 4);
+  head.write("WAVE", 8);
+  head.write("fmt ", 12);
+  head.writeUInt32LE(16, 16);
+  head.writeUInt16LE(1, 20);
+  head.writeUInt16LE(channels, 22);
+  head.writeUInt32LE(rate, 24);
+  head.writeUInt32LE(rate * channels * (bits / 8), 28);
+  head.writeUInt16LE(channels * (bits / 8), 32);
+  head.writeUInt16LE(bits, 34);
+  let at = 36;
+  if (extraChunk) {
+    head.write("LIST", at); head.writeUInt32LE(4, at + 4); at += 12;
+  }
+  head.write("data", at);
+  head.writeUInt32LE(dataBytes, at + 4);
+  return { head, fileSize: at + 8 + dataBytes };
+}
+
+test("a WAV header is read from the chunk table, not from a fixed offset", async () => {
+  const { describeWav } = await import("../lib/voices.js");
+
+  const plain = wavHeader({ seconds: 12 });
+  assert.equal(Math.round(describeWav(plain.head, { fileSize: plain.fileSize }).seconds), 12);
+
+  // Plenty of encoders put a LIST or fact chunk before the audio. Slicing at a
+  // fixed 44 bytes then counts metadata as audio and misreports the length.
+  const withList = wavHeader({ seconds: 12, extraChunk: true });
+  assert.equal(Math.round(describeWav(withList.head, { fileSize: withList.fileSize }).seconds), 12);
+
+  // fileSize is passed separately because the caller reads only the head —
+  // reading a 350 MB file to learn it is too big would be the very problem.
+  const big = wavHeader({ seconds: 1824, rate: 48000, channels: 2 });
+  const seen = describeWav(big.head, { fileSize: big.fileSize });
+  assert.equal(Math.round(seen.seconds), 1824, "length comes from fileSize, not the buffer handed in");
+  assert.equal(seen.channels, 2);
+
+  // Not a WAV at all, and absence.
+  assert.equal(describeWav(Buffer.from("this is an mp3, honestly")), null);
+  assert.equal(describeWav(null), null);
+  assert.equal(describeWav(Buffer.alloc(10)), null);
+});
+
+test("an untrimmed reference is refused with the reason, not left to crash", async () => {
+  const { describeWav, referenceProblem } = await import("../lib/voices.js");
+
+  const huge = wavHeader({ seconds: 1824, rate: 48000, channels: 2 });
+  const problem = referenceProblem(describeWav(huge.head, { fileSize: huge.fileSize }));
+  assert.ok(problem, "half an hour of audio must not reach the model");
+  assert.match(problem, /30\.4 minutes/, "say how long it actually is");
+  assert.match(problem, /ten seconds/, "and what to do about it");
+
+  // The clips that should pass, including the one that shipped.
+  for (const seconds of [10, 12, 28.8, 60]) {
+    const ok = wavHeader({ seconds });
+    assert.equal(referenceProblem(describeWav(ok.head, { fileSize: ok.fileSize })), null, `${seconds}s is fine`);
+  }
+
+  // Too short to clone from is also worth saying, rather than producing a bad
+  // voice and leaving somebody to wonder why.
+  const tiny = wavHeader({ seconds: 1.2 });
+  assert.match(referenceProblem(describeWav(tiny.head, { fileSize: tiny.fileSize })), /only 1\.2s/);
+
+  // A file that is not a PCM WAV names that, rather than falling through.
+  assert.match(referenceProblem(null), /PCM WAV/);
+});
