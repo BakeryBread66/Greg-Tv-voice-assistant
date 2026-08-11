@@ -704,3 +704,25 @@ test("the dialog can say which voice is loaded", async () => {
   // failed by reading a property that did not exist rather than by throwing.
   assert.equal(typeof loadedVoiceId, "function");
 });
+
+test("a progress bar is not an error message", async () => {
+  const { usefulError } = await import("../lib/voices.js");
+
+  // tqdm redraws with carriage returns, so the whole bar is ONE line by \n and
+  // "the last line" hands the user a wall of percentages. Reported verbatim
+  // from a dialog: "cloned voice exited (1) — Sampling: 0%| ... 31.65it/s".
+  const bars =
+    "Sampling:   0%|          | 0/1000 [00:00<?, ?it/s]\r" +
+    "Sampling:   0%|          | 3/1000 [00:00<00:36, 27.24it/s]\r" +
+    "Sampling:   1%|          | 7/1000 [00:00<00:31, 31.24it/s]";
+
+  assert.equal(usefulError(bars), "", "noise alone is nothing to report, not a wall of it");
+  assert.doesNotMatch(usefulError(bars + "\nKilled by the operating system"), /Sampling/);
+  assert.equal(usefulError(bars + "\nKilled by the operating system"), "Killed by the operating system");
+
+  // And a real error still wins over the bars in front of it.
+  assert.match(
+    usefulError(bars + "\ntorch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 GiB."),
+    /ran out of memory/,
+  );
+});
