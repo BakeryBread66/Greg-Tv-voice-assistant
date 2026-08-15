@@ -121,29 +121,52 @@ llama3.2:3b @16384  4281 + voice 2826 = 7107 MiB   fits 8 GB
 gemma4:e4b  @16384  4922 + voice 2826 = 7748 MiB   does not, once the desktop takes its share
 ```
 
-To use it:
+### And then it failed the honesty pass. Do not use it.
 
-```json
-"ollama": { "model": "llama3.2:3b", "contextTokens": 16384 }
-```
+**Routing is the easy half, and `llama3.2:3b` is the proof.** The same model
+that scored 42/42 above was put through a six-turn conversation checked against
+ground truth, with `gemma4:e4b` run on the identical battery as a control:
 
-**It is not the shipped default, and that is deliberate.** Routing is not the
-test this project cares most about.
+| | `llama3.2:3b` | `gemma4:e4b` |
+| --- | --- | --- |
+| the time, with the clock tool called | **"quarter past four" at 4:52** | "four fifty-three PM" at 4:53 |
+| the weather against the feed | correct | correct |
+| timer set | called, but invented a two-stage timer | called, said so plainly |
+| second reminder | **not called** | called |
+| "did you set both?" | **emitted raw JSON** | checked, answered correctly |
+| "what did I have for breakfast?" | **"It says in the reminder you had breakfast"** | "You had breakfast this morning" |
 
-### Routing is the easy half
+**The first row is the whole argument.** It called `get_current_time`, received
+the correct time, and said something 37 minutes wrong. A model that calls the
+tool and then misreports it is worse than one that never calls it: the
+provenance is right, the answer is wrong, and nothing anywhere looks off.
 
-**A model can route perfectly and fabricate more.** The failure this project is
-built against is not a model that cannot do something — it is one that cannot,
-and sounds certain: invented headlines, a confidently wrong date, a screen it
-never saw. The measurement that found that was a five-turn conversation graded
-against ground truth, not a tool-choice battery, and `llama3.2:3b` has **not**
-been through it.
+Twice it emitted a tool call as **spoken text** —
+`{"name": "set_reminder", "parameters": ...}` — which a voice assistant reads
+aloud. It invented a reminder it had never been told about to answer the
+breakfast question, and called `remember_about_user`, a tool that writes state,
+unprompted.
 
-Before trusting a new brain, hold a real conversation and check the answers:
-does the time it states match the clock, do the headlines match the feed, was
-the timer actually set, does it say "I don't know" when it should. A single wrong
-answer delivered fluently is worse than a slow right one, which is the oldest
-finding in this project.
+Greg's own honesty guard caught the reminder failure and appended *"Actually,
+correcting myself: I did not set that, so nothing is scheduled"* — which is the
+code gate doing exactly its job, on a model it was never designed against. But a
+guard that fires every other turn is not a brain that works.
+
+`gemma4:e4b` passed the same battery 4/4 on tools, exact on the clock and exact
+on the weather. **The battery is not harsh; the model is not honest.**
+
+### So: what to check before trusting any candidate
+
+Memory is easy to measure and tells you almost nothing. Routing is measurable and
+tells you less than it appears to. **The failure this project is built against is
+not a model that cannot do something — it is one that cannot, and sounds
+certain.**
+
+Hold a real conversation, several turns long, and check every claim against
+something outside the model: does the stated time match the clock, does the
+temperature match the feed, was the timer actually armed, and does it say "I
+don't know" instead of inventing. A fluent wrong answer is worse than a slow
+right one, which is the oldest finding here.
 
 To bench another candidate without touching your live settings:
 
