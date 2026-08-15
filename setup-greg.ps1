@@ -28,7 +28,15 @@ param(
   [switch]$Minimal,
   # The cloned voice. Off by default even under -All: it is about 6 GB and it
   # cannot finish without a voice recording you supply yourself.
-  [switch]$Clone
+  [switch]$Clone,
+  # Mini Greg, for a machine whose graphics card is the tight resource. Writes
+  # config.json from config.mini.example.json and skips the vision model, which
+  # cannot fit beside the cloned voice on 8 GB. See docs/mini.md.
+  #
+  # NOT called -Mini. PowerShell resolves unambiguous parameter prefixes, so a
+  # -Mini switch would make the existing -Min shorthand for -Minimal ambiguous
+  # and break it for anyone already typing it.
+  [switch]$SmallCard
 )
 
 # Deliberately NOT "Stop". Windows PowerShell 5.1 wraps a native executable's
@@ -185,14 +193,14 @@ function ClonePython() {
 # Is .venv-clone actually usable, or merely present?
 #
 # This was `Test-Path .venv-clone\Scripts\python.exe`, which is true the instant
-# the venv is created — BEFORE torch and chatterbox go in. So an install that
+# the venv is created - BEFORE torch and chatterbox go in. So an install that
 # failed at the last step left a folder that every later run reported as
 # "already exists - leaving it alone", and the setup could never repair itself.
 # Reported from a second machine that failed on chatterbox and then could not
 # get back to a working state by re-running.
 #
 # The honest test is whether the thing imports, plus the watermarker perth
-# leaves as None when pkg_resources is missing — the two ways this venv is
+# leaves as None when pkg_resources is missing - the two ways this venv is
 # known to be present and useless.
 function CloneVenvState() {
   $vpy = ".venv-clone\Scripts\python.exe"
@@ -411,7 +419,7 @@ function DoClone($s) {
   Say ""
   # Already built? Then nothing about Python matters, and saying "blocked" over
   # a working install is simply wrong. This check sat BELOW the Python one, so
-  # the machine Greg was written on — which has a working .venv-clone — reported
+  # the machine Greg was written on - which has a working .venv-clone - reported
   # the cloned voice as blocked on every run.
   if ($s.CloneVenv -eq "ready") {
     Record "cloned voice" "already" ".venv-clone works"
@@ -603,10 +611,45 @@ if (-not $survey.Winget -and -not $DryRun) {
   Say "hand - the README lists them - or update App Installer from the Store." "Yellow"
 }
 
+# Mini Greg's config profile.
+#
+# It will NOT overwrite an existing config.json. That file carries the user's
+# location, wake words and personality dials, and replacing all of it to save
+# video memory would be a large silent trade for a small stated one. Naming the
+# settings to change instead is the honest version, and docs/mini.md lists them.
+function DoMiniConfig() {
+  $src = Join-Path $PSScriptRoot "config.mini.example.json"
+  $dst = Join-Path $PSScriptRoot "config.json"
+
+  if (-not (Test-Path $src)) {
+    Record "mini profile" "failed" "config.mini.example.json is missing"
+    Say "  config.mini.example.json not found - re-clone, or restore that file." "Red"
+    return
+  }
+
+  if (Test-Path $dst) {
+    Record "mini profile" "skipped" "config.json already exists"
+    Say "  config.json already exists and has NOT been touched." "Yellow"
+    Say "  Apply the profile by hand - docs/mini.md lists what changes." "Yellow"
+    return
+  }
+
+  if ($DryRun) {
+    Record "mini profile" "would" "write config.json from config.mini.example.json"
+    Say "  would write config.json from config.mini.example.json" "Cyan"
+    return
+  }
+
+  Copy-Item $src $dst
+  Record "mini profile" "written" "config.json from the mini profile"
+  Say "  wrote config.json from config.mini.example.json" "Green"
+}
+
 Say ""
 Say "Choosing what to install" "White"
 Rule
 DoNode $survey
+if ($SmallCard) { DoMiniConfig }
 
 if ($Minimal) {
   Say "  -Minimal: stopping after Node." "Cyan"
@@ -614,13 +657,21 @@ if ($Minimal) {
   if (Ask "A real brain, running locally?" "9.6 GB") { DoBrain $survey } else { Record "brain" "skipped" "declined" }
   if (Ask "Hear you offline?"            "200 MB") { DoEars  $survey } else { Record "ears"  "skipped" "declined" }
   if (Ask "Speak offline?"               "100 MB") { DoVoice $survey } else { Record "voice" "skipped" "declined" }
-  if (Ask "Let him see your screen?"     "5.9 GB") { DoEyes  $survey } else { Record "eyes"  "skipped" "declined" }
+  # Not offered under -SmallCard, rather than offered and regretted. On 8 GB the
+  # cloned voice holds 2.8 GB, leaving 5.2 for Ollama against the vision model's
+  # 5.9 - and Ollama's answer to that is not a clean error, it offloads to system
+  # RAM, so a screen question takes a minute rather than failing. Downloading
+  # 5.9 GB to get that is worse than not having it.
+  if ($SmallCard) {
+    Record "eyes" "skipped" "-SmallCard: will not fit beside the cloned voice"
+    Say "  -SmallCard: skipping $VISION_MODEL. See docs/mini.md." "Cyan"
+  } elseif (Ask "Let him see your screen?" "5.9 GB") { DoEyes $survey } else { Record "eyes" "skipped" "declined" }
 }
 
 # The cloned voice, which until now was reachable ONLY by passing -Clone.
 #
-# setup-greg.bat exists to be double-clicked — that is what its own comment says
-# it is for — and a double-click passes no arguments, so the interactive path
+# setup-greg.bat exists to be double-clicked - that is what its own comment says
+# it is for - and a double-click passes no arguments, so the interactive path
 # asked four questions and silently could not install this one at all. Reported
 # by somebody on a second machine who ran the setup, saw no .venv-clone, and had
 # no way to find out why. Every other tier has always had a prompt; this is the

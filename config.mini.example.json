@@ -1,0 +1,157 @@
+{
+  "_profile": "MINI GREG - for a machine whose graphics card is the tight resource. Copy over config.json, or run setup-greg.ps1 -SmallCard. Everything not mentioned here is identical to config.example.json; see docs/mini.md for the arithmetic and for what you give up.",
+
+  "name": "Greg",
+
+  "_visionComment": "NO EYES, and on 8 GB this is barely a choice. The cloned voice holds 2.8 GB in its own process, leaving 5.2 for Ollama, and qwen2.5vl:7b wants 5.9 - it does not fit. Ollama's answer to that is not a clean error: it offloads layers to system RAM, so a screen question does not fail, it takes a minute and feels broken. enabled:false is honest instead - Greg says he cannot see and asks you to describe it, and take_screenshot still works because saving a picture needs no model at all. Set enabled:true to get them back; the eyesight test runs then and will tell you the truth about the model either way.",
+  "vision": {
+    "enabled": false,
+    "openAtStartup": false,
+    "model": "qwen2.5vl:7b",
+    "maxWidth": 1280,
+    "display": "primary",
+    "think": false,
+    "keepAlive": ""
+  },
+
+  "_clonedVoiceComment": "The voice is the point of Mini Greg and stays on. precision auto gives fp16 on the GPU, measured 3801 MiB resident down to 2826 - a gigabyte back, no speed cost, output level within 0.1 dB. Only the t3 backbone is cast; casting the vocoder too saves another 400 MiB and sounds rushed and incoherent, so it is not an option and is not a dial.",
+  "clonedVoice": {
+    "enabled": true,
+    "reference": "voices/greg-reference.wav",
+    "exaggeration": 0.5,
+    "cfgWeight": 0.5,
+    "temperature": 0.8,
+    "device": "cuda",
+    "precision": "auto",
+    "port": 4750
+  },
+
+  "_ollamaComment": "THE BRAIN IS THE LARGEST NUMBER IN THE BUDGET AND IT IS LEFT AT THE PROVEN ONE. gemma4:e4b at 32768 costs 5141 MiB at the DRIVER level - not the 3418 MB Ollama reports, which counts weights and KV cache but not the CUDA context and compute buffers. The driver figure is the one that has to fit. With the cloned voice at 2826 MiB that is ~7.8 GB, which fits 10-12 GB comfortably and does NOT fit 8. See docs/mini.md: there is no proven model for an 8 GB card yet, and picking one on size alone is the mistake this project has now made three times.",
+  "_contextComment": "How much contextTokens costs DEPENDS ON THE MODEL, and assuming otherwise is a trap. On gemma4:e4b the whole range is worth ~280 MiB (8192 -> 4861, 32768 -> 5141), so it is nearly free and is left wide open. On llama3.2:3b the same change is worth 2755 MiB (8192 -> 3325, 16384 -> 4281, 32768 -> 6080) - a fat KV cache. Do not carry a context measurement from one model to another. And do not shrink it far: tool schemas are ~3587 tokens and the system prompt ~1562, so ~5150 is spent before a word of conversation, and an overflow truncates the prompt where the honesty rules live.",
+  "ollama": {
+    "url": "http://localhost:11434",
+    "model": "gemma4:e4b",
+    "think": "auto",
+    "temperature": 0.7,
+    "keepAlive": "30m",
+    "contextTokens": 32768,
+    "timeoutMs": 120000
+  },
+
+  "_speechComment": "Ears on the processor. base.en is small and CPU transcription of a single utterance is quick, so this trades a little latency for the CUDA context Whisper would otherwise hold on the card. Set device back to auto if you have the room and want the speed.",
+  "speech": {
+    "mode": "auto",
+    "model": "base.en",
+    "device": "cpu",
+    "python": "py",
+    "port": 4748
+  },
+
+  "conversationLog": {
+    "enabled": true,
+    "file": "conversations.jsonl",
+    "keepDays": 90
+  },
+  "speechCache": {
+    "enabled": true,
+    "folder": "cache/tts",
+    "maxEntries": 500,
+    "warmOnStart": true
+  },
+  "appearance": { "background": "#008080" },
+  "volume": 1,
+  "files": {},
+  "subtitles": "auto",
+  "vocoder": { "enabled": false, "amount": 0.6 },
+  "systemVoice": { "enabled": true, "voice": "", "rate": 0 },
+  "localVoice": {
+    "enabled": true,
+    "voice": "en_US-ryan-high",
+    "speed": 1,
+    "port": 4749
+  },
+  "voice": "en-GB-RyanNeural",
+  "rate": "+5%",
+  "pitch": "+0Hz",
+  "wakeWords": [
+    "hey greg",
+    "hi greg",
+    "hey craig",
+    "hey greh",
+    "hey gregg",
+    "a greg",
+    "hey grey"
+  ],
+  "personality": {
+    "humour": 45,
+    "edge": 15,
+    "directness": 60,
+    "warmth": 55,
+    "brevity": 70,
+    "formality": 30,
+    "mirror": true,
+    "style": ""
+  },
+  "followUp": {
+    "enabled": true,
+    "seconds": 7
+  },
+  "bargeIn": {
+    "enabled": true,
+    "sustainMs": 600
+  },
+  "listening": {
+    "floorMultiple": 3.5,
+    "minLevel": 0.012,
+    "deviceId": "default"
+  },
+  "spotify": {
+    "enabled": true,
+    "duckVolume": 25,
+    "minEpisodeMinutes": 5,
+    "redirectUri": ""
+  },
+  "screenshots": {
+    "_comment": "Still works with no eyes. Saving a picture needs no model - only interpreting one does.",
+    "enabled": true,
+    "folder": "screenshots",
+    "display": "primary",
+    "maxWidth": 0
+  },
+  "alerts": {
+    "enabled": true,
+    "pollMs": 180000
+  },
+  "stocks": {
+    "index": "^IXIC",
+    "symbols": [
+      "AAPL",
+      "MSFT",
+      "NVDA",
+      "AMZN",
+      "GOOGL",
+      "TSLA"
+    ]
+  },
+  "apod": {
+    "key": ""
+  },
+  "location": {
+    "mode": "auto",
+    "city": "",
+    "region": "",
+    "latitude": null,
+    "longitude": null
+  },
+  "units": {
+    "temperature": "fahrenheit",
+    "windSpeed": "mph"
+  },
+  "provider": "auto",
+  "model": "claude-opus-5",
+  "effort": "low",
+  "maxTokens": 700,
+  "port": 4747,
+  "openBrowser": true,
+  "identity": "a voice-controlled AI assistant living on the user's Windows PC, in the spirit of Jarvis from Iron Man"
+}

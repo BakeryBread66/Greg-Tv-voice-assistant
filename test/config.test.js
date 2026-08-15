@@ -187,3 +187,69 @@ test("a config with nothing in it does not throw", () => {
   assert.doesNotThrow(() => firstRunNotice({}, { exists: () => false, wasCreated: false }));
   assert.doesNotThrow(() => firstRunNotice(null, { exists: () => false, wasCreated: true }));
 });
+
+// ---------------------------------------------------------------------------
+// The Mini profile — config.mini.example.json
+//
+// A second example file is a second representation of one fact, which is the
+// shape of half the bugs this project has recorded. The specific failure it
+// invites: somebody adds a setting to config.example.json, does not add it to
+// the Mini one, and every Mini user silently loses that feature with nothing
+// to explain why. Absence in a config is not an error, it is a default — which
+// is exactly what makes it hard to notice.
+//
+// So the two are compared key by key rather than trusted to stay in step.
+// ---------------------------------------------------------------------------
+
+const MINI_EXAMPLE = path.join(path.dirname(CONFIG_EXAMPLE), "config.mini.example.json");
+
+function readJson(file) {
+  return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+// Comment keys are documentation and are free to differ: the Mini profile
+// explains different things, at length, and should not be forced to carry the
+// full one's prose or vice versa.
+function settingKeys(obj) {
+  return Object.keys(obj).filter((k) => !k.startsWith("_")).sort();
+}
+
+test("the Mini profile is valid JSON and parses to an object", () => {
+  const mini = readJson(MINI_EXAMPLE);
+  assert.equal(typeof mini, "object");
+  assert.notEqual(mini, null);
+});
+
+test("the Mini profile carries every setting the full example does", () => {
+  const full = settingKeys(readJson(CONFIG_EXAMPLE));
+  const mini = settingKeys(readJson(MINI_EXAMPLE));
+
+  const missing = full.filter((k) => !mini.includes(k));
+  assert.deepEqual(
+    missing,
+    [],
+    `config.mini.example.json is missing ${missing.join(", ")} — a Mini user would ` +
+    `silently get the built-in default instead of the shipped one`,
+  );
+});
+
+test("the Mini profile is a real profile, not a copy", () => {
+  const mini = readJson(MINI_EXAMPLE);
+
+  // The two decisions that define it. Both measured: the eyes cannot fit beside
+  // the cloned voice on 8 GB, and fp16 is 975 MiB back for no audible cost.
+  assert.equal(mini.vision.enabled, false, "Mini Greg has no eyes");
+  assert.equal(mini.clonedVoice.enabled, true, "the cloned voice is the point of Mini Greg");
+  assert.equal(mini.clonedVoice.precision, "auto", "auto resolves to fp16 on a GPU");
+});
+
+test("the Mini profile does not name an unproven brain", () => {
+  // The whole reason this profile ships with gemma4:e4b unchanged. Picking a
+  // model on download size is wrong twice over — llama3.2:3b is 2 GB on disk
+  // and 6080 MiB resident at 32768, MORE than gemma4:e4b's 5141 — and routing
+  // 28 tools is a separate question again, answered by bench/routing.mjs and
+  // not by this file. If somebody changes this default, the bench should have
+  // been run first and this assertion updated deliberately.
+  const mini = readJson(MINI_EXAMPLE);
+  assert.equal(mini.ollama.model, readJson(CONFIG_EXAMPLE).ollama.model);
+});

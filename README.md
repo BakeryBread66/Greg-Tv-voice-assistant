@@ -54,18 +54,29 @@ Measured, resident, on a 24 GB card:
 | Brain (`gemma4:e4b`) | 3.4 GB |
 | Ears (Whisper) | ~1 GB, or none on the CPU |
 | Eyes (`qwen2.5vl:7b`) | 5.9 GB |
-| Cloned voice | ~4.0 GB |
+| Cloned voice | **2.8 GB** |
+
+**Those are Ollama's figures, and your card loses more than that.** Ollama's
+`size_vram` counts weights and the KV cache; the driver also sees the CUDA
+context and compute buffers, and the gap is not small — `gemma4:e4b` reports
+3418 MB and costs **5141 MiB** of the card. If you are budgeting a machine
+rather than reading a comparison, use the driver-level table in
+[docs/mini.md](docs/mini.md).
 
 So **~6 GB** runs the brain and ears comfortably, **~12 GB** adds the eyes, and
 **~16 GB** holds all four at once.
 
-**On 8 GB the cloned voice is possible but tight.** The brain and the clone come
-to about 7.4 GB before Windows takes its share of the card for the desktop, so
-it wants the eyes switched off and the ears moved to the processor
-(`"speech": { "device": "cpu" }`, where Whisper is perfectly usable). If it still
-runs out, a smaller chat model is the lever — but that trades the conversation
-for the voice, and Piper is the better trade: it runs on the CPU, uses no video
-memory at all, and is nine times faster than realtime.
+**On 8 GB, run [Mini Greg](docs/mini.md).** It is the same Greg with the eyes off
+and the cloned voice in half precision — which is measured at 2826 MiB against
+the 3801 it used to take, for no audible difference and no speed cost. The voice
+stays; it is the point.
+
+```
+setup-greg.ps1 -SmallCard
+```
+
+Screenshots still work without the eyes, because saving a picture needs no model
+— only interpreting one does.
 
 Running the clone itself on the CPU (`clonedVoice.device`) works and is too slow
 to talk to — measured at **3.7x realtime**, about twelve seconds before he starts
