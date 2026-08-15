@@ -38,6 +38,7 @@ DEVICE = os.environ.get("GREG_CLONE_DEVICE", "cuda")
 EXAGGERATION = float(os.environ.get("GREG_CLONE_EXAGGERATION", "0.5"))
 CFG_WEIGHT = float(os.environ.get("GREG_CLONE_CFG_WEIGHT", "0.5"))
 TEMPERATURE = float(os.environ.get("GREG_CLONE_TEMPERATURE", "0.8"))
+PRECISION = os.environ.get("GREG_CLONE_PRECISION", "auto").lower()
 
 if not REFERENCE.exists():
     print(f"ERROR reference clip not found: {REFERENCE}", flush=True)
@@ -50,8 +51,65 @@ if DEVICE == "cuda" and not torch.cuda.is_available():
     print("ERROR cuda requested but not available", flush=True)
     sys.exit(1)
 
-MODEL = ChatterboxTTS.from_pretrained(device=DEVICE)
+# Half precision, and ONLY on the t3 backbone. Measured on this machine against
+# the same sentence and seed: 3801 MiB resident falls to 2826, peak 4163 to
+# 3074, with synthesis unchanged at ~1.47x realtime and the output level within
+# 0.1 dB. That is a gigabyte of somebody's card for no audible cost.
+#
+# s3gen stays in fp32 and that is not caution, it is a result. Hard-casting it
+# fails outright with a dtype mismatch, and the autocast version that does run
+# renders 1.6 dB louder and was described by the person listening as "rushed and
+# barely coherent" -- while duration, RMS and non-finite counts all still looked
+# fine. Every number said yes and the ear said no. Do not re-litigate this from
+# the metrics; the extra ~400 MiB is not for sale.
+#
+# CPU keeps fp32: half precision there is slower rather than faster, and system
+# memory is not the resource anybody is short of.
+if PRECISION == "auto":
+    PRECISION = "fp16" if DEVICE == "cuda" else "fp32"
+if PRECISION not in ("fp16", "fp32"):
+    print(f"ERROR unknown precision '{PRECISION}' — use fp16, fp32 or auto", flush=True)
+    sys.exit(1)
+HALF = PRECISION == "fp16" and DEVICE == "cuda"
+
+# Load on the CPU when casting, so the card never holds the fp32 copy at all.
+# Loading onto the GPU and casting there works and settles at the same figure,
+# but it spends 3801 MiB on the way -- which is fine on a large card and is
+# exactly the transient that would fail on the small ones this exists for.
+MODEL = ChatterboxTTS.from_pretrained(device="cpu" if HALF else DEVICE)
 SAMPLE_RATE = MODEL.sr
+
+# Read the reference ONCE. generate() rebuilds the conditionals from the clip on
+# every call when handed audio_prompt_path, which re-reads and re-embeds the
+# whole recording per sentence -- and rebuilds them in fp32, which would undo
+# the cast below on the first reply. Preparing them here is what makes half
+# precision possible, and it drops the per-sentence cost of the reference too.
+MODEL.prepare_conditionals(str(REFERENCE), exaggeration=EXAGGERATION)
+
+if HALF:
+    MODEL.t3 = MODEL.t3.half()
+    cond = MODEL.conds.t3
+    cond.speaker_emb = cond.speaker_emb.half()
+    cond.emotion_adv = cond.emotion_adv.half()
+    for name in ("clap_emb", "cond_prompt_speech_emb"):
+        value = getattr(cond, name, None)
+        if torch.is_tensor(value) and value.is_floating_point():
+            setattr(cond, name, value.half())
+
+    MODEL.t3.to(DEVICE)
+    MODEL.s3gen.to(DEVICE)
+    MODEL.ve.to(DEVICE)
+    MODEL.conds.to(DEVICE)
+    MODEL.device = DEVICE
+    torch.cuda.empty_cache()
+
+# generate() rebuilds the conditionals -- in fp32 -- whenever the exaggeration it
+# is passed differs from the one they were built with. Half cannot hold most
+# values exactly (0.3 stores as 0.30004883), so passing the configured number
+# back would trip that comparison and crash on a dtype mismatch, for every
+# setting except the few that happen to round-trip. Read the value back out of
+# the tensor and pass exactly that, so the test is always false.
+EFFECTIVE_EXAGGERATION = float(MODEL.conds.t3.emotion_adv[0, 0, 0])
 
 # One model, several sentences in flight at once from the streaming path, and a
 # ThreadingHTTPServer underneath. Same call as piper_server.py: serialize rather
@@ -61,10 +119,11 @@ SYNTHESIS_LOCK = threading.Lock()
 
 def synthesize_wav(text):
     with SYNTHESIS_LOCK:
+        # No audio_prompt_path: the conditionals were built once at startup and
+        # rebuilding them here would re-read the reference and drop back to fp32.
         wav = MODEL.generate(
             text,
-            audio_prompt_path=str(REFERENCE),
-            exaggeration=EXAGGERATION,
+            exaggeration=EFFECTIVE_EXAGGERATION,
             cfg_weight=CFG_WEIGHT,
             temperature=TEMPERATURE,
         )
@@ -101,6 +160,7 @@ class Handler(BaseHTTPRequestHandler):
                 "reference": REFERENCE.name,
                 "sampleRate": SAMPLE_RATE,
                 "exaggeration": EXAGGERATION,
+                "precision": PRECISION,
             })
         else:
             self._send_json(404, {"error": "not found"})
@@ -141,5 +201,13 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"READY reference={REFERENCE.stem} rate={SAMPLE_RATE} port={PORT}", flush=True)
+    # Precision is reported rather than assumed by the caller: it is resolved
+    # here (auto depends on the device, and a CPU run stays fp32 whatever the
+    # config says), and the speech cache keys on it. Node deriving it a second
+    # time is the one-fact-two-representations trap this project keeps paying for.
+    print(
+        f"READY reference={REFERENCE.stem} rate={SAMPLE_RATE} "
+        f"precision={PRECISION} port={PORT}",
+        flush=True,
+    )
     server.serve_forever()

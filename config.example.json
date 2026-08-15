@@ -8,6 +8,8 @@
     "cfgWeight": 0.5,
     "temperature": 0.8,
     "device": "cuda",
+    "_precision": "auto = fp16 on the GPU, fp32 on the CPU. fp16 saves ~975 MiB of VRAM with no audible change and no speed cost. Only the t3 backbone is cast; casting the vocoder too saves another 400 MiB and sounds rushed and incoherent, so it is not an option.",
+    "precision": "auto",
     "port": 4750
   },
   "conversationLog": {
