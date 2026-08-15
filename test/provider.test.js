@@ -105,3 +105,60 @@ test("an unreachable Ollama fails the warm-up without throwing at the caller", a
     globalThis.fetch = real;
   }
 });
+
+// ---------------------------------------------------------------------------
+// Can this model call tools at all?
+//
+// Ollama declares it, and the provider already checked — but SILENTLY. A model
+// without the capability simply had `tools` omitted from its request and nothing
+// anywhere said so, which meant pointing ollama.model at a completion-only model
+// gave a Greg that started up healthy, offered 28 tools he could never call, and
+// answered everything from imagination.
+//
+// Measured on gemma3:1b, whose capabilities are `completion` and nothing else:
+// 0 tool calls in six turns, a wrong time, a wrong day, and "seventy-three
+// degrees with a chance of rain" against a real 89F and clear.
+//
+// Same shape as the vision swatch test: establish what the model can do, then
+// withhold what it cannot.
+// ---------------------------------------------------------------------------
+
+function stubShow(capabilities, { ok = true } = {}) {
+  return async (url) => {
+    if (String(url).endsWith("/api/show")) {
+      return { ok, status: ok ? 200 : 500, json: async () => ({ capabilities }) };
+    }
+    return { ok: true, json: async () => ({}) };
+  };
+}
+
+async function askSupportsTools(capabilities, options) {
+  const real = globalThis.fetch;
+  globalThis.fetch = stubShow(capabilities, options);
+  try {
+    return await createOllamaProvider(CONFIG).supportsTools();
+  } finally {
+    globalThis.fetch = real;
+  }
+}
+
+test("a model that declares tools can use them", async () => {
+  assert.equal(await askSupportsTools(["completion", "tools", "thinking"]), true);
+});
+
+test("a completion-only model is caught", async () => {
+  // gemma3:1b's actual capability list.
+  assert.equal(await askSupportsTools(["completion"]), false);
+});
+
+test("a model that declares nothing at all is caught", async () => {
+  assert.equal(await askSupportsTools([]), false);
+  assert.equal(await askSupportsTools(undefined), false);
+});
+
+test("an unreachable Ollama does NOT strip tools", async () => {
+  // A different failure, and ready() is what reports it. Answering "no tools"
+  // on a network blip would silently take every tool away from a model that has
+  // them — much worse than the thing this guard exists to prevent.
+  assert.equal(await askSupportsTools(["tools"], { ok: false }), true);
+});
