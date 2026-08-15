@@ -96,18 +96,60 @@ tokens and the system prompt ~1,562, so about 5,150 is spent before a word of
 conversation.** At 8192 that leaves ~3,000 for history and the reply, and an
 overflow truncates the prompt — which is where the honesty rules live.
 
-### If you want to settle it
+### What has been measured: `llama3.2:3b` at 16384
 
-Measuring the memory is the easy half and is not the half that matters.
+Benched with `node bench/routing.mjs --model=llama3.2:3b --ctx=16384`:
 
-```bash
-node bench/routing.mjs
+| tools | routing | avg |
+| ---: | ---: | ---: |
+| 28 (what Greg has today) | **42/42** | 419 ms |
+| 35 | 42/42 | 253 ms |
+| 42 | 39/42 | 258 ms |
+
+**And the control fell to 17/21**, which is what makes the first column mean
+anything — a bench that scores full marks on competing padding is not registering
+misses. It lost `get_engineering` to `get_hardware_temps` 3/3, exactly as
+`gemma4:e4b` does, which is a comment on that tool's name rather than on either
+model. The single sweep miss is at 42 tools, which Greg does not have: "skip this
+song" going to `play_music` instead of `control_playback`.
+
+So on routing it is **level with `gemma4:e4b` at today's tool count**, faster, and
+641 MiB cheaper at the same context:
+
+```
+llama3.2:3b @16384  4281 + voice 2826 = 7107 MiB   fits 8 GB
+gemma4:e4b  @16384  4922 + voice 2826 = 7748 MiB   does not, once the desktop takes its share
 ```
 
-That checks the model still picks the right tool out of 28, and runs a control
-against competing padding so a perfect score means something rather than proving
-the harness cannot register a miss. It reads `ollama.model` from `config.json`,
-so point that at the candidate first.
+To use it:
+
+```json
+"ollama": { "model": "llama3.2:3b", "contextTokens": 16384 }
+```
+
+**It is not the shipped default, and that is deliberate.** Routing is not the
+test this project cares most about.
+
+### Routing is the easy half
+
+**A model can route perfectly and fabricate more.** The failure this project is
+built against is not a model that cannot do something — it is one that cannot,
+and sounds certain: invented headlines, a confidently wrong date, a screen it
+never saw. The measurement that found that was a five-turn conversation graded
+against ground truth, not a tool-choice battery, and `llama3.2:3b` has **not**
+been through it.
+
+Before trusting a new brain, hold a real conversation and check the answers:
+does the time it states match the clock, do the headlines match the feed, was
+the timer actually set, does it say "I don't know" when it should. A single wrong
+answer delivered fluently is worse than a slow right one, which is the oldest
+finding in this project.
+
+To bench another candidate without touching your live settings:
+
+```bash
+node bench/routing.mjs --model=SOME:model --ctx=16384
+```
 
 **And routing is still not the whole test.** A model can route perfectly and
 fabricate more. The failure this project cares about is not a model that cannot

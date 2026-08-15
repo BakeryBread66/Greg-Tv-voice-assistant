@@ -4,6 +4,14 @@
 //   node bench/routing.mjs 5         5 runs per prompt instead of 3
 //   node bench/routing.mjs 3 --skip-control    (don't)
 //
+//   node bench/routing.mjs --model=llama3.2:3b --ctx=16384
+//                                    a candidate brain, without touching
+//                                    config.json. This is how you answer "can a
+//                                    smaller model still run Greg" — and it is
+//                                    the half that matters, because measuring
+//                                    its memory is easy and tells you nothing
+//                                    about whether it still calls the tools.
+//
 // NOT part of `npm test`, on purpose. It needs Ollama and takes minutes, and
 // this project has twice had its suite wrecked by a test that did real work —
 // once restarting a Piper sidecar, once loading a 4 GB clone model. Run it
@@ -39,7 +47,27 @@ import { TOOLS } from "../lib/tools/index.js";
 import { buildSystemPrompt } from "../lib/brain.js";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+// The model and context window can be overridden from the command line, so a
+// candidate brain can be benched WITHOUT editing config.json. That is not
+// convenience: config.json is the live settings file, and a bench that requires
+// editing it leaves somebody's real config changed if the run is interrupted —
+// which for a long bench against an unfamiliar model is exactly when it will be.
+//
+// `--name=value`, joined with an equals ON PURPOSE. A space-separated value puts
+// a bare number in argv, and RUNS below picks the first bare number it finds —
+// so `--ctx 16384` would quietly ask for sixteen thousand runs per prompt.
+function flag(name) {
+  const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
+  return hit ? hit.slice(name.length + 3) : null;
+}
+
 const config = JSON.parse(fs.readFileSync(path.join(ROOT, "config.json"), "utf8"));
+
+const MODEL = flag("model");
+const CTX = flag("ctx");
+if (MODEL) config.ollama.model = MODEL;
+if (CTX) config.ollama.contextTokens = Number(CTX);
+
 const provider = createOllamaProvider(config);
 
 const PLACE = "Chapel Hill, North Carolina";
