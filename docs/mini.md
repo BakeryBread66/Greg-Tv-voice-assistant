@@ -155,6 +155,39 @@ guard that fires every other turn is not a brain that works.
 `gemma4:e4b` passed the same battery 4/4 on tools, exact on the clock and exact
 on the weather. **The battery is not harsh; the model is not honest.**
 
+### Three candidates measured, three rejected
+
+All at 16384, all through the same six-turn battery against ground truth, with
+`gemma4:e4b` as the control:
+
+| | + voice | tools | the clock | the weather | verdict |
+| --- | ---: | :---: | --- | --- | --- |
+| `gemma4:e4b` | 7748 MiB | 4/4 | exact | exact | **the only one that passes** |
+| `qwen3:1.7b` | 6229 MiB | 4/4 | exact | exact | **set a 10-HOUR timer** |
+| `llama3.2:3b` | 7107 MiB | 3/4 | 37 min wrong | correct | raw JSON spoken aloud |
+| `gemma3:1b` | 4204 MiB | 0/4 | wrong | invented | cannot call tools at all |
+
+**Check `ollama show <model>` before anything else.** `gemma3:1b` lists
+`completion` and nothing else — no `tools` — so it was never a candidate, and one
+instant command would have said so before a single measurement. It invented all
+six answers, including "seventy-three degrees with a chance of rain" against a
+real 89°F and clear.
+
+**`qwen3:1.7b` came closest and is the most instructive failure.** It fits 8 GB
+with room to spare, routes 41/42, and reports the clock and every weather field
+exactly. Asked for a ten-minute timer it called the tool, and what landed in the
+store was **due in 600 minutes** — a ten-hour timer, with the text `"the pasta"`.
+
+Nobody mentioned pasta. It comes from the tool schema's own parameter
+description: *"What it is for, e.g. 'the pasta', 'call the dentist'"*. **The
+model copied the example out of the description and used it as the value.**
+`gemma4:e4b` never does this; a small model does. If you are writing a tool
+schema, an example is not free.
+
+A reminder system that turns ten minutes into ten hours is disqualifying here
+for the reason this project already gives for caring about reminders at all:
+medication.
+
 ### So: what to check before trusting any candidate
 
 Memory is easy to measure and tells you almost nothing. Routing is measurable and
