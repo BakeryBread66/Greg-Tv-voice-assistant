@@ -60,6 +60,7 @@ voice-audition/
 # --- Build, cache and downloads --------------------------------------------
 node_modules/
 cache/
+.venv/
 .venv-clone/
 __pycache__/
 *.pyc

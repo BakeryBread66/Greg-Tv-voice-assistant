@@ -27,9 +27,10 @@ picture reacts to your voice and to his own.*
 tracking, now playing, media keys and the system voice. The brain, the ears, the
 voice, all fourteen channels and every tool but two work unchanged, and he names
 what is missing in the startup banner rather than letting you find out when
-something quietly does nothing. Run `./start-greg.sh`. **Nobody has run him on a
-Linux desktop yet** — see [docs/linux.md](docs/linux.md), including what each
-missing piece would take, most of which is easier there than it was here.
+something quietly does nothing. Run `./setup-greg.sh` then `./start-greg.sh`.
+**Nobody has run him on a Linux desktop yet** — see [docs/linux.md](docs/linux.md),
+including what each missing piece would take, most of which is easier there than
+it was here.
 
 macOS is in the same position and even less tested.
 

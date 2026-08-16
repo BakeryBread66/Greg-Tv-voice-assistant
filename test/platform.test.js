@@ -13,8 +13,17 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import path from "node:path";
 
-import { platformNotice, browserCommand, onPath, WINDOWS_ONLY } from "../lib/platform.js";
+import {
+  platformNotice,
+  browserCommand,
+  onPath,
+  WINDOWS_ONLY,
+  sidecarPython,
+  clonePython,
+  setupCommand,
+} from "../lib/platform.js";
 
 test("Windows gets no platform notice at all", () => {
   // The banner's rule is that it reports what actually loaded. A line saying
@@ -103,6 +112,47 @@ test("appMode is reported, because it changes the microphone advice", () => {
   const url = "http://x";
   assert.equal(browserCommand(url, { platform: "linux", exists: () => true }).appMode, true);
   assert.equal(browserCommand(url, { platform: "linux", exists: () => false }).appMode, false);
+});
+
+test("the sidecar Python default stops being 'py' off Windows", () => {
+  // The bug this closes: whisper and piper defaulted to the Windows launcher
+  // `py` for everyone, so on Linux they spawned a command that does not exist
+  // and Greg lost his offline ears and voice with nothing saying why.
+
+  // Windows is unchanged, venv or not — callers add the -3 the launcher needs.
+  assert.equal(sidecarPython({ platform: "win32", root: "/x", exists: () => true }), "py");
+  assert.equal(sidecarPython({ platform: "win32", root: "/x", exists: () => false }), "py");
+
+  // Linux with the setup venv present: use its interpreter. PEP 668 refuses a
+  // system pip install on modern distros, so setup-greg.sh puts the sidecars in
+  // .venv and this is what finds them.
+  const venv = path.join("/x", ".venv", "bin", "python");
+  assert.equal(sidecarPython({ platform: "linux", root: "/x", exists: (p) => p === venv }), venv);
+
+  // Linux and macOS with no venv: python3, for someone who installed the
+  // packages another way. Never `py`, which is the whole point.
+  assert.equal(sidecarPython({ platform: "linux", root: "/x", exists: () => false }), "python3");
+  assert.equal(sidecarPython({ platform: "darwin", root: "/x", exists: () => false }), "python3");
+});
+
+test("the cloned-voice venv is found under bin off Windows, Scripts on it", () => {
+  // A venv puts its interpreter under Scripts\ on Windows and bin/ everywhere
+  // else. Reading the Windows path on Linux would report the clone "not
+  // installed" while it sat right there. Expected values go through path.join so
+  // the assertion is about the directory, not the separator of the test machine.
+  assert.equal(clonePython({ platform: "win32", root: "/x" }), path.join("/x", ".venv-clone", "Scripts", "python.exe"));
+  assert.equal(clonePython({ platform: "linux", root: "/x" }), path.join("/x", ".venv-clone", "bin", "python"));
+  assert.equal(clonePython({ platform: "darwin", root: "/x" }), path.join("/x", ".venv-clone", "bin", "python"));
+});
+
+test("setupCommand never tells a Linux user to run a .ps1", () => {
+  // The clone "not installed" message names the setup command. A Linux user told
+  // to run setup-greg.ps1 -Clone has been handed an instruction they cannot act
+  // on — the exact defect the comment above that message warns about.
+  assert.equal(setupCommand("-Clone", { platform: "win32" }), "setup-greg.ps1 -Clone");
+  assert.equal(setupCommand("-Clone", { platform: "linux" }), "./setup-greg.sh --clone");
+  assert.equal(setupCommand("", { platform: "win32" }), "setup-greg.ps1");
+  assert.equal(setupCommand("", { platform: "linux" }), "./setup-greg.sh");
 });
 
 test("onPath splits PATH the way the platform does", () => {

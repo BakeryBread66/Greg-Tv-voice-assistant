@@ -20,13 +20,34 @@ globe, reminders, memory, personalities, settings, and both Python sidecars.
 - **Piper** (`piper_server.py`) and the **cloned voice** (`clone_server.py`)
   contain no Windows-specific code at all.
 
+### Setup
+
 ```bash
-./start-greg.sh      # installs dependencies on a first run, then starts him
+chmod +x *.sh        # git does not always preserve the executable bit
+./setup-greg.sh      # installs Ollama, the model, and the offline ears + voice
+./start-greg.sh      # starts him (also installs the npm packages on a first run)
 ./stop-greg.sh       # stops the server and its sidecars
 ```
 
-Both need `chmod +x` once after cloning, since git does not always preserve the
-bit.
+`setup-greg.sh` is the counterpart to Windows' `setup-greg.ps1`: a tiered
+installer that walks up Node, the brain, the offline ears, the offline voice and
+the eyes, then **re-surveys and reports what is actually true**. It reads your
+package manager (apt, dnf, pacman, zypper or brew), installs Ollama through its
+official `install.sh`, and pulls the model. Run it with `--dry-run` first to see
+the plan without changing anything; `--minimal`, `--small-card` and `--clone`
+match the PowerShell flags. Nothing in it is required — Greg runs on the cloud
+voice and browser speech with only Node.
+
+**The ears and voice need one thing Windows does not: a venv.** Modern distros
+refuse a system-wide `pip install` (PEP 668), so `setup-greg.sh` puts
+faster-whisper and piper-tts in a `.venv` at the repo root, and Greg spawns the
+sidecars from there automatically — `lib/platform.js` looks for `.venv/bin/python`
+before falling back to `python3`. On Windows the sidecars use the `py` launcher;
+that default was the same `py` for everyone until it was made platform-aware, so
+before that the offline ears and voice silently did nothing here. If you install
+the packages your own way instead of using `setup-greg.sh`, either drop them in
+`.venv` or point `config.json`'s `listening.python` and `speech.python` at your
+interpreter.
 
 ## What is off, and what each would take
 
@@ -84,10 +105,16 @@ substitutes for a different computer.
 
 ## Known untested
 
-**Nobody has run Greg on Linux.** The five modules above degrade by design and
-their `ENOENT` handling is tested, the browser choice and the banner wording are
-tested, and `npm test` passes — but the whole thing has never started on a Linux
-desktop.
+**Nobody has run Greg on Linux.** What is tested, on Windows: the five modules
+above degrade by design and their `ENOENT` handling is checked; the browser
+choice, the banner wording, the platform-aware sidecar-Python default (`.venv` →
+`python3`, never `py` off Windows) and the clone venv path are all unit-tested;
+and `setup-greg.sh --dry-run` runs cleanly. What is NOT: no real install has been
+done on a Linux box, so `setup-greg.sh` doing the actual `apt`/`dnf`,
+`ollama pull`, venv and pip work is unverified, and the whole thing has never
+started on a Linux desktop.
 
-If you are the first, the useful things to report are the startup banner and
-whether the microphone reaches the page. Those two answer most of it.
+If you are the first, the useful things to report are the startup banner, whether
+`./setup-greg.sh` finishes, and whether the microphone reaches the page and
+Whisper transcribes — those answer most of it. Please send fixes you have
+actually run: no amount of testing on Windows substitutes for a Linux machine.
