@@ -72,7 +72,12 @@ test("a root admits what is inside it and nothing that merely looks similar", ()
 
 test("the shapes a secret takes are refused, and ordinary documents are not", () => {
   for (const secret of [
-    "C:\\Users\\me\\Documents\\.env",
+    // Joined with this platform's separator, like the three at the end. As a
+    // literal "C:\\Users\\..." it was one long file NAME on Linux - there, a
+    // backslash is an ordinary character - so the test failed there while
+    // proving nothing about Linux at all. On Windows it is the same path as
+    // before.
+    ["C:", "Users", "me", "Documents", ".env"].join(path.sep),
     "/home/me/Documents/.env.local",
     "/home/me/Documents/id_rsa",
     "/home/me/Documents/server.pem",

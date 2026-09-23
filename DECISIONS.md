@@ -10,7 +10,8 @@ change, benchmark, find an improvement in, and thereby break something that
 does not announce itself.
 
 You will find comments in the source that say "see CLAUDE.md". That is a
-private engineering log kept during development; it does not ship. Everything
+private engineering log kept during development - CLAUDE.md and the `notes/`
+folder beside it - and it does not ship. Everything
 in it that constrains the code is repeated here.
 
 Figures were measured on a 24 GB NVIDIA card. Treat them as relative rather

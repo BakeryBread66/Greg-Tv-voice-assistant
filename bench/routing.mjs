@@ -98,6 +98,12 @@ const BATTERY = [
   ["what did we talk about yesterday",      "recall_conversation"],
   ["remember that i'm allergic to peanuts", "remember_about_user"],
   ["skip this song",                        "control_playback"],
+  // The pair that was confused in real use: asked three times to clear the
+  // history, he forgot facts instead and said the history was gone. The code
+  // gate now corrects him out loud, but whether he ROUTES it right is only
+  // answerable here, against the real model.
+  ["clear our conversation history",        "clear_conversation_history"],
+  ["forget that my car is blue",            "forget_about_user"],
 ];
 
 // Padding for the SWEEP: plausible tools a voice assistant might grow, in

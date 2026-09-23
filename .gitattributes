@@ -1,0 +1,28 @@
+# Line endings, decided once, here, rather than by whichever machine last
+# touched a file.
+#
+# Greg is edited on Windows and, by Claude sessions, from Linux - and the two
+# disagree about line endings. Without this file every file one side saved
+# showed as "modified" to the other, with no real change in it: 36 of them at
+# once, burying any real diff. The repository has always stored LF; this makes
+# that a rule, and makes git compare files AFTER normalising them, so an
+# ending-only difference is never a change.
+
+# Text is stored as LF. On checkout each machine gets its own native endings.
+* text=auto
+
+# Except where the program reading the file cares.
+# cmd.exe misreads labels and long blocks in a batch file with LF endings.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+# bash stops at the first \r it meets.
+*.sh  text eol=lf
+
+# Never text, whatever the heuristics think.
+*.png  binary
+*.gif  binary
+*.ico  binary
+*.jpg  binary
+*.wav  binary
+*.mp3  binary
+*.onnx binary

@@ -75,3 +75,11 @@ desktop.ini
 # Built on your own machine by launcher/build.ps1 from launcher/Greg.cs, and
 # never committed: a binary nobody can read is exactly what this repo avoids.
 Greg.exe
+
+# Where the Claude desktop app saves files from a session - a screenshot, a
+# generated image. The user's to keep or delete, never part of Greg.
+Claude outputs/
+
+# CLAUDE.md's detail, split out of it: the same private engineering log, and
+# private for the same reason - it describes this machine.
+notes/

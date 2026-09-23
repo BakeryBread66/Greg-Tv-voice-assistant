@@ -1,0 +1,40 @@
+# npm test on every push and pull request, on Windows and on Linux.
+#
+# Greg has been tested by hand, before each commit, on one machine. That caught
+# a lot - and it could not catch "passes here, fails there": the suite failed
+# on Linux for weeks over one test that only ever made sense on Windows, and
+# nobody ran it on Linux to see. Now both run, on the two Node versions a new
+# user is most likely to have.
+#
+# Nothing here needs a model, a microphone, a graphics card or the network: the
+# suite is pure decisions, stubbed fetches and temp files, about two seconds.
+# Ollama, Whisper and Piper are never installed.
+
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing is information about the other, not a reason to
+      # stop it.
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --no-fund --no-audit
+      - run: npm test
