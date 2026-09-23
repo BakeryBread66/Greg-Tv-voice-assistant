@@ -379,6 +379,10 @@ const server = http.createServer(async (req, res) => {
       console.log(`\n[you]  ${text}`);
       const started = Date.now();
       let firstAt = null;
+      // The first sentence of the ANSWER, as opposed to anything said first. With
+      // "Let me look that up." spoken in 0.3 s, firstAt alone would make a
+      // ten-second search look instant in the log.
+      let answerAt = null;
       let index = 0;
 
       const send = (payload) => {
@@ -393,9 +397,13 @@ const server = http.createServer(async (req, res) => {
         String(text).trim(),
         history,
         config,
-        (sentence) => {
+        (sentence, meta = {}) => {
           if (firstAt === null) firstAt = Date.now() - started;
-          send({ type: "sentence", text: sentence, index: index++ });
+          if (answerAt === null && !meta.preface) answerAt = Date.now() - started;
+          // `preface` marks what he says before the answer - "Let me look that
+          // up.", a welcome back - so the page speaks it at once without
+          // mistaking it for the answer's first sentence. See ask() in voice.js.
+          send({ type: "sentence", text: sentence, index: index++, ...(meta.preface ? { preface: true } : {}) });
         },
         awaySeconds
       );
@@ -404,6 +412,7 @@ const server = http.createServer(async (req, res) => {
       const detail = [
         usedTools.length ? `used: ${usedTools.join(", ")}` : null,
         firstAt !== null ? `first sentence ${firstAt}ms` : null,
+        answerAt !== null && answerAt !== firstAt ? `answer ${answerAt}ms` : null,
         `total ${Date.now() - started}ms`,
         timing?.length ? describeTiming(timing) : null,
       ].filter(Boolean);
@@ -413,7 +422,7 @@ const server = http.createServer(async (req, res) => {
       // streaming path measures its own time to first sentence. Skipped for the
       // turn that cleared the log, for the reason given in /api/chat above.
       if (historyCleared) console.log("[log] conversation history cleared (asked for by voice)");
-      else logTurn({ user: text, reply, usedTools, ms: Date.now() - started, firstMs: firstAt, timing });
+      else logTurn({ user: text, reply, usedTools, ms: Date.now() - started, firstMs: firstAt, answerMs: answerAt, timing });
 
       send({ type: "done", reply, usedTools });
       return res.end();

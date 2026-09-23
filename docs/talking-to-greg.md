@@ -126,9 +126,11 @@ talks him into inventing a headline or skipping a tool call.
 
 ## How the conversation flows
 
-Three things stop it feeling like operating a machine.
+Four things stop it feeling like operating a machine.
 
 **He starts talking before he's finished writing.** The reply is split into sentences as it arrives, and each one is synthesized while the previous one is still playing. Measured on a two-sentence weather answer, the wait before he makes any sound dropped from **4526 ms to 2566 ms — 43%**. On a one-sentence answer it changes nothing, because there's nothing to overlap; the gain is real but it isn't universal.
+
+**He says when he's working on it.** A web search or a look at your screen takes several seconds, so he says *"Let me look that up."* or *"Let me have a look."* the moment he starts, then answers. Anything else that turns out slow gets *"One moment."* after two seconds — but a quick answer gets nothing, so "what time is it" is never answered "One moment. It's noon." The phrases are cached in his voice ahead of time, so they come out at once even with a cloned voice.
 
 **Follow-ups don't need the wake word.** For seven seconds after he answers the status reads *"Still listening…"* and anything you say goes straight to him:
 

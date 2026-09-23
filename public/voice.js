@@ -950,13 +950,25 @@ async function ask(text) {
     // the rest because a turn that calls a tool emits no content at all until
     // the final round — so once text starts arriving, all of it arrives.
     const rest = [];
+    // What he says BEFORE the answer: "Let me look that up." while a search
+    // runs, or a welcome back. Spoken the moment it arrives, and kept apart from
+    // `heard`, because counting it as sentence one would hold the answer's real
+    // first sentence back with 2..N - so the answer would start only once the
+    // whole of it had been written and synthesised, which is slower than
+    // saying nothing at all. Not kept for "what?" either: that replays the
+    // answer, not the "hold on".
+    const prefaces = [];
 
     for await (const event of readEvents(res.body)) {
       if (abandoned()) return; // you cut in; this answer is no longer wanted
-      if (event.type === "sentence") {
+      if (event.type === "sentence" && event.preface) {
+        prefaces.push(event.text);
+        showGreg([...prefaces, ...heard].join(" "));
+        spoken.push(speak(event.text, { replayable: false }));
+      } else if (event.type === "sentence") {
         // Say it and show it as it lands, rather than waiting for the full answer.
         heard.push(event.text);
-        showGreg(heard.join(" "));
+        showGreg([...prefaces, ...heard].join(" "));
         if (heard.length === 1) spoken.push(speak(event.text));
         else rest.push(event.text);
       } else if (event.type === "done") {
@@ -1060,12 +1072,12 @@ function primeSpeech() {
  * subtitle is advanced through them as it plays. Synthesizing sentences 2..N
  * together is what lets Piper choose its own pauses; see ask().
  */
-function speak(text, { sentences = null } = {}) {
+function speak(text, { sentences = null, replayable = true } = {}) {
   const clean = String(text ?? "").trim();
   if (!clean) return Promise.resolve();
 
   return new Promise((resolve) => {
-    speech.items.push({ text: clean, sentences, audio: null, done: resolve });
+    speech.items.push({ text: clean, sentences, replayable, audio: null, done: resolve });
     primeSpeech();
     drainSpeech();
   });
@@ -1116,7 +1128,7 @@ async function drainSpeech() {
       // and a different sentence is not what "say that again" asks for.
       // `cached` items came FROM a replay; re-capturing them would grow the
       // list every time you asked twice.
-      if (blob && !item.cached) {
+      if (blob && !item.cached && item.replayable !== false) {
         // `sentences` travels with the clip: a replayed clip that holds several
         // of them must still walk its subtitle, or "what?" on a muted set gives
         // back the right audio under a subtitle clipped to four lines.
