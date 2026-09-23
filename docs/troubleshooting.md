@@ -20,7 +20,9 @@ loud. Worth running after editing anything in `lib/`.
 
 You can also just close the console window that `start-greg.bat` opened, or press `Ctrl+C` in it — that's the same thing.
 
-> **Closing Greg's face window does not shut him down.** That only closes the display; the server keeps running in the background. Use `stop-greg.bat` or close the console window.
+> **Whether closing his window shuts him down depends on how you started him.** From Greg.exe — the Start menu or desktop icon — it does, about fifteen seconds after the window closes, so a reload does not count; **Stop Greg** in the tray icon's menu does it at once. From `start-greg.bat` it does not: that only closes the display, and the server keeps running. Use `stop-greg.bat` or close the console window.
+>
+> Started from Greg.exe there is no console window, but everything it would have shown is one click away: **Show console** in the tray icon's menu. If Greg.exe's Greg stops by himself with an error, that console opens on its own with the reason at the bottom. It is kept in memory only, never written to disk, because it includes what was said to him.
 
 When the server stops, any open face window notices within a few seconds, goes dim, says **"Offline — Greg has been shut down"**, and releases the microphone. Leave it open if you like — when you next run `start-greg.bat`, the page reconnects on its own.
 

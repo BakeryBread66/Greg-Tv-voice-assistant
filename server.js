@@ -42,6 +42,7 @@ import { initReminders } from "./lib/reminders.js";
 import { initStt, transcribe, sttStatus, stopStt } from "./lib/stt.js";
 import { visionStatus } from "./lib/vision.js";
 import { setWindowRect } from "./lib/screen.js";
+import { createWindowWatch, startedByLauncher } from "./lib/lifetime.js";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(ROOT, "public");
@@ -118,6 +119,19 @@ function broadcast(payload) {
     }
   }
 }
+
+// Started by Greg.exe, he has no console to close, so his window is what keeps
+// him alive: the page holds /api/presence open, and when the last one has been
+// gone for the grace period he shuts down the way Ctrl+C does. From
+// start-greg.bat none of this is armed and nothing changes. See lib/lifetime.js.
+const LAUNCHED = startedByLauncher();
+const windows = createWindowWatch({
+  onAllClosed: () => {
+    console.log("\n[greg] his window was closed, so he is shutting down.");
+    stopChildren();
+    process.exit(0);
+  },
+});
 
 function readBody(req, limitBytes = 1_000_000) {
   return new Promise((resolve, reject) => {
@@ -214,6 +228,63 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // --- Presence: one per open Greg window, so Greg.exe's Greg stops with it ---
+    //
+    // Separate from /api/events on purpose. That stream opens only after "Wake
+    // Greg" is clicked, so a window closed before then would never have been
+    // counted; this one opens as the page loads. Counted only when LAUNCHED, and
+    // only asked for by the page when /api/config says so.
+    if (url.pathname === "/api/presence" && req.method === "GET") {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      });
+      // A quick retry: this reconnect is what cancels a shutdown countdown.
+      res.write("retry: 1000\n\n");
+      if (LAUNCHED) windows.opened();
+      const keepAlive = setInterval(() => {
+        try {
+          res.write(": ping\n\n");
+        } catch {
+          clearInterval(keepAlive);
+        }
+      }, 25000);
+      req.on("close", () => {
+        clearInterval(keepAlive);
+        if (LAUNCHED) windows.closed();
+      });
+      return;
+    }
+
+    // --- Stop, cleanly. Greg.exe's "Stop Greg", and anything else local ---
+    //
+    // Answered first and acted on after, so the caller hears back rather than
+    // having its connection cut. The same shutdown as Ctrl+C: the sidecars are
+    // stopped by name, so the graphics card is given back, rather than killed
+    // as a process tree — a tree kill takes the browser with it if Greg was
+    // the one who started it. POST, so the Origin check above keeps web pages out.
+    if (url.pathname === "/api/quit" && req.method === "POST") {
+      sendJson(res, 200, { ok: true });
+      console.log("\n[greg] asked to shut down.");
+      setTimeout(() => {
+        stopChildren();
+        process.exit(0);
+      }, 100);
+      return;
+    }
+
+    // --- Open his window, unless one is already open ---
+    //
+    // Greg.exe asks for this when it cannot find the window to bring forward.
+    // Refused while a window is still connected, because two Gregs means two
+    // microphones and two voices answering the same question.
+    if (url.pathname === "/api/open" && req.method === "POST") {
+      if (LAUNCHED && windows.open > 0) return sendJson(res, 200, { opened: false, reason: "a window is already open" });
+      openBrowser(`http://localhost:${PORT}`);
+      return sendJson(res, 200, { opened: true });
+    }
+
     // --- Heartbeat: lets the page notice when Greg has been shut down ---
     if (url.pathname === "/api/health") {
       return sendJson(res, 200, { ok: true });
@@ -266,6 +337,9 @@ const server = http.createServer(async (req, res) => {
         // opened. Read-only, like the name beside it — settings.js still owns it.
         desktop: settingsState().appearance.background,
         startedAt: STARTED_AT,
+        // True when Greg.exe started him: the page then holds /api/presence
+        // open, and closing the window stops him.
+        exitsWithWindow: LAUNCHED,
       });
     }
 
@@ -771,7 +845,13 @@ function openBrowser(url) {
   const { command, args, appMode } = browserCommand(url, { exists: lookFor });
 
   try {
-    spawn(command, args, { detached: true, stdio: "ignore" }).unref();
+    const child = spawn(command, args, { detached: true, stdio: "ignore" });
+    // A missing command is reported as an EVENT, not thrown, so the catch below
+    // never sees it — and an unheard 'error' event is an uncaught exception,
+    // which ends Greg. Opening a window is never worth that; now that Greg.exe
+    // can ask for one at any time, it could happen well after startup.
+    child.on("error", () => console.log(`Open ${url} in Chrome or Edge to talk to ${config.name ?? "Greg"}.`));
+    child.unref();
     // No --app means an ordinary tab WITH an address bar, which changes the
     // advice for a blocked microphone — public/mic-help.js tells people to click
     // the padlock, and in app mode there is no address bar holding one.
@@ -1006,7 +1086,7 @@ server.listen(PORT, "127.0.0.1", async () => {
     Manner:   ${personalityLine(character)}
 
     Say "Hey ${config.name ?? "Greg"}" once the page has mic access.
-    Ctrl+C here to shut him down.
+    ${LAUNCHED ? "Close his window, or use Stop Greg in the tray, to shut him down." : "Ctrl+C here to shut him down."}
   ==================================================
 `);
 

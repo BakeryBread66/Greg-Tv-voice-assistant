@@ -38,6 +38,14 @@ to `127.0.0.1`, so nothing on your network can reach him. Any program running as
 you on the same machine still can, and `/api/chat` can call his tools. That is
 normal for a local app — Ollama does the same — but it is worth knowing.
 
+**Greg.exe can stop him and open his window**, through `POST /api/quit` and
+`POST /api/open`. Like every POST they pass the Origin check below, so a web page
+cannot call them; a program already running as you can stop Greg, which
+`stop-greg.bat` always could. Greg.exe itself is built on your machine from
+`launcher/Greg.cs` rather than shipped as a binary, so what runs is what you can
+read, and it writes nothing to disk — its console, which includes what was said,
+is kept in memory only.
+
 **Requests are checked for where they came from.** The `Host` header is validated
 so a website cannot reach Greg by pointing its own domain at `127.0.0.1` (DNS
 rebinding), and the `Origin` header is checked on anything that changes state. A

@@ -119,6 +119,23 @@ marks the brain amber, and its tagline stops claiming everything is local.
 **Do not "fix" basic mode by falling back to the cloud.** Basic mode is the
 honest fallback: it runs here and says it is limited.
 
+## 7. Greg.exe is built on your machine, and stops Greg by name
+
+Two things about the launcher look like obvious improvements.
+
+**Committing the built Greg.exe** would save a step. It would also put an
+unsigned binary nobody can read into a repository whose whole security story is
+"what runs is what you can read", and a downloaded .exe carries the internet
+mark that makes SmartScreen stop it. `launcher/build.ps1` compiles
+`launcher/Greg.cs` with the C# compiler that is part of Windows, in a second,
+with no download. Keep it that way.
+
+**Stopping him with a process-tree kill** (`taskkill /T`) looks thorough. But if
+Greg's server was what started Chrome, Chrome is its child, and a tree kill
+closes every tab you have open. Stop Greg asks the server to shut down
+(`/api/quit`, which stops the sidecars itself), and only if that fails kills
+node and the sidecars by name — the same list `stop-greg.bat` matches.
+
 ---
 
 ## A known defect: the sentence gap overwrites Piper's own phrasing

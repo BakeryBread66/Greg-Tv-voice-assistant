@@ -71,3 +71,7 @@ __pycache__/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Built on your own machine by launcher/build.ps1 from launcher/Greg.cs, and
+# never committed: a binary nobody can read is exactly what this repo avoids.
+Greg.exe

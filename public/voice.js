@@ -39,9 +39,19 @@ const el = {
 // is clicked and the microphone is open, because that is the moment somebody
 // deciding whether to talk to him needs to know it. Fire and forget: wake() and
 // comeOnline() repaint it from their own fetches.
+//
+// The same fetch says whether Greg.exe started him. If it did, this window is
+// what keeps him running, so it holds /api/presence open from now until it
+// closes — from page load rather than from "Wake Greg", so a window shut before
+// waking still counts as shut. The EventSource reconnects on its own, and that
+// reconnect is what tells a reload apart from a close. See lib/lifetime.js.
+let presence = null;
 fetch("/api/config")
   .then((res) => res.json())
-  .then((info) => showBrainPlace(info))
+  .then((info) => {
+    showBrainPlace(info);
+    if (info.exitsWithWindow && !presence) presence = new EventSource("/api/presence");
+  })
   .catch(() => {});
 
 // Top-level await: the 3D renderer is loaded on demand, and everything below

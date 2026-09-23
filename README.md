@@ -157,9 +157,19 @@ installed. Both are checked before anything is downloaded.
 
 ## Start him up
 
-Double-click **`start-greg.bat`**.
+Open **Greg** from the Start menu or your desktop — the setup puts him in both.
+He starts with no console window, a little television appears in the tray, and a
+window opens with Greg's face.
 
-A window opens with Greg's face. Click **Wake Greg**, allow microphone access when the browser asks, and say:
+No shortcut? Greg.exe is built by the setup rather than downloaded, so an install
+from before it existed does not have one yet. Double-click `setup-greg.bat` again —
+it skips anything already installed and builds Greg.exe at the end, with the
+compiler that is part of Windows. From a terminal in the Greg folder,
+`setup-greg.bat -Launcher` does only that part, with no questions and no
+downloads. **`start-greg.bat`** still works too, and is the one to reach for when
+something is wrong, because it shows his console as he runs.
+
+When the window opens, click **Wake Greg**, allow microphone access when the browser asks, and say:
 
 > "Hey Greg, what's the weather?"
 
@@ -184,7 +194,14 @@ gitignored, because it ends up holding your coordinates.
 
 ## Shut him down
 
-Double-click **`stop-greg.bat`**. It tells you whether he was running and confirms when he's off.
+**Close his window.** Started from Greg.exe, he notices his window has gone and
+shuts down about fifteen seconds later — long enough that reloading the page
+does not count — and gives the graphics card back. **Stop Greg** in the tray
+icon's menu does the same straight away, and **Show console** there shows
+everything start-greg.bat's window used to, startup banner included. It is kept
+in memory only, so nothing he heard is written to disk.
+
+Started from `start-greg.bat`, double-click **`stop-greg.bat`**. It tells you whether he was running and confirms when he's off.
 
 ## The rest of it
 

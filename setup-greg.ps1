@@ -36,7 +36,10 @@ param(
   # NOT called -Mini. PowerShell resolves unambiguous parameter prefixes, so a
   # -Mini switch would make the existing -Min shorthand for -Minimal ambiguous
   # and break it for anyone already typing it.
-  [switch]$SmallCard
+  [switch]$SmallCard,
+  # Only build Greg.exe and put him in the Start menu and on the desktop. Skips
+  # every tier and every download - for an install that is already set up.
+  [switch]$Launcher
 )
 
 # Deliberately NOT "Stop". Windows PowerShell 5.1 wraps a native executable's
@@ -315,6 +318,31 @@ function Ask([string]$question, [string]$size, [bool]$defaultYes = $true) {
 
 # -------------------------------------------------------------------- tiers --
 
+# Greg.exe: the icon you double-click instead of start-greg.bat. It starts him
+# with no console window, sits in the tray, and stops him when his window
+# closes. Built here from launcher\Greg.cs by the C# compiler that is part of
+# Windows, so it costs no download and is built even under -Minimal; only the
+# shortcuts are asked about. See launcher\build.ps1.
+#
+# Run as a separate powershell rather than dot-sourced, because build.ps1 ends
+# with `exit` and in this session that would end the whole setup.
+function DoLauncher([bool]$shortcuts) {
+  $build = Join-Path $PSScriptRoot "launcher\build.ps1"
+  if (-not (Test-Path $build)) {
+    Record "Greg.exe" "failed" "launcher\build.ps1 is missing"
+    Say "  launcher\build.ps1 not found - re-clone, or restore that folder." "Red"
+    return
+  }
+  $argv = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $build)
+  if (-not $shortcuts) { $argv += "-NoShortcuts" }
+  if ($DryRun) { $argv += "-DryRun" }
+  & powershell @argv
+  if ($LASTEXITCODE -ne 0) { Record "Greg.exe" "failed" "see the output above"; return }
+  if ($DryRun) { Record "Greg.exe" "would" "build Greg.exe from launcher\Greg.cs"; return }
+  $where = if ($shortcuts) { "Start menu and desktop" } else { "in the Greg folder" }
+  Record "Greg.exe" "installed" $where
+}
+
 function DoNode($s) {
   if ($s.NodeMajor -ge $MIN_NODE) { Record "Node.js" "already" "v$($s.NodeMajor)"; Say "  Node.js v$($s.NodeMajor) - already good." "Green"; return }
   if (-not $s.Winget) {
@@ -592,10 +620,26 @@ function Summary($before) {
   }
   Rule
   Say ""
-  Say "  Now double-click start-greg.bat." "White"
+  if (Test-Path (Join-Path $PSScriptRoot "Greg.exe")) {
+    Say "  Now open Greg from the Start menu or your desktop." "White"
+    Say "  (start-greg.bat still works too, and shows his console as he runs.)" "DarkGray"
+  } else {
+    Say "  Now double-click start-greg.bat." "White"
+  }
 }
 
 # --------------------------------------------------------------------- main --
+
+if ($Launcher) {
+  Say ""
+  Say "Greg setup - just Greg.exe" "White"
+  Rule
+  DoLauncher $true
+  Rule
+  $made = @($script:Results | Where-Object { $_.Key -eq "Greg.exe" -and $_.State -eq "installed" })
+  if ($made.Count -gt 0) { Say "  Now open Greg from the Start menu or your desktop." "White" }
+  return
+}
 
 Say ""
 Say "Greg setup" "White"
@@ -689,5 +733,10 @@ if ($Clone) {
 } else {
   Record "cloned voice" "skipped" "declined"
 }
+
+Say ""
+Say "Greg.exe, so he starts like any other program" "White"
+Rule
+DoLauncher (Ask "Put Greg in the Start menu and on your desktop?" "no download")
 
 Summary $survey

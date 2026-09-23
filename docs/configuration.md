@@ -240,8 +240,11 @@ A key on its own does nothing. `"auto"` used to prefer Claude whenever a key was
 
 ```
 Greg/
-├── start-greg.bat        Double-click to start
-├── stop-greg.bat         Double-click to stop
+├── Greg.exe              Double-click to start: no console, tray icon, stops
+│                         when his window closes (built by setup, never committed)
+├── launcher/             Greg.cs, the icon, and build.ps1 that compiles them
+├── start-greg.bat        The other way to start, with his console showing
+├── stop-greg.bat         Stops a Greg started from start-greg.bat
 ├── config.json           Voice, wake words, location, model
 ├── server.js             Local web server
 ├── memory.json           What Greg remembers about you (created on first use)
@@ -256,6 +259,7 @@ Greg/
 ├── lib/
 │   ├── stt.js            Manages the Whisper process
 │   ├── brain.js          Conversation loop, tools, basic-mode fallback
+│   ├── lifetime.js       Greg.exe's Greg stops when his window closes
 │   ├── channels.js       Which programme is on his screen
 │   ├── nowplaying.js     Manages the media-session watcher
 │   ├── memory.js         Long-term memory
