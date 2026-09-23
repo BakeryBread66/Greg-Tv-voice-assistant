@@ -25,7 +25,8 @@ import { startAlertWatch, stopAlertWatch, onAlert } from "./lib/alertwatch.js";
 import { initConversationLog, logTurn, conversationStats, clearConversations } from "./lib/conversation-log.js";
 import { getCursor, stopCursorWatch } from "./lib/cursor.js";
 import { initCache, warmCache, cacheStats, DEFAULT_PHRASES } from "./lib/tts-cache.js";
-import { think, initBrain, describeBrain, initVision, warmBrain } from "./lib/brain.js";
+import { think, initBrain, describeBrain, initVision, warmBrain, describeTiming } from "./lib/brain.js";
+import { getAirQuality } from "./lib/airquality.js";
 import { browserCommand, platformNotice, onPath } from "./lib/platform.js";
 import { getLocation } from "./lib/location.js";
 import { getWeather, weatherToSentence } from "./lib/weather.js";
@@ -350,14 +351,14 @@ const server = http.createServer(async (req, res) => {
 
       console.log(`\n[you]  ${text}`);
       const started = Date.now();
-      const { reply, usedTools, historyCleared } = await think(String(text).trim(), history, config, null, awaySeconds);
+      const { reply, usedTools, historyCleared, timing } = await think(String(text).trim(), history, config, null, awaySeconds);
       console.log(`[greg] ${reply}`);
-      if (usedTools.length) console.log(`       (used: ${usedTools.join(", ")}, ${Date.now() - started}ms)`);
+      if (usedTools.length) console.log(`       (used: ${usedTools.join(", ")}, ${Date.now() - started}ms: ${describeTiming(timing)})`);
 
       // The turn that cleared the log is not written back into it: "clear my
       // history" should leave an empty log, not one line saying it was cleared.
       if (historyCleared) console.log("[log] conversation history cleared (asked for by voice)");
-      else logTurn({ user: text, reply, usedTools, ms: Date.now() - started });
+      else logTurn({ user: text, reply, usedTools, ms: Date.now() - started, timing });
       return sendJson(res, 200, { reply, usedTools });
     }
 
@@ -388,7 +389,7 @@ const server = http.createServer(async (req, res) => {
         }
       };
 
-      const { reply, usedTools, historyCleared } = await think(
+      const { reply, usedTools, historyCleared, timing } = await think(
         String(text).trim(),
         history,
         config,
@@ -404,6 +405,7 @@ const server = http.createServer(async (req, res) => {
         usedTools.length ? `used: ${usedTools.join(", ")}` : null,
         firstAt !== null ? `first sentence ${firstAt}ms` : null,
         `total ${Date.now() - started}ms`,
+        timing?.length ? describeTiming(timing) : null,
       ].filter(Boolean);
       console.log(`       (${detail.join(", ")})`);
 
@@ -411,7 +413,7 @@ const server = http.createServer(async (req, res) => {
       // streaming path measures its own time to first sentence. Skipped for the
       // turn that cleared the log, for the reason given in /api/chat above.
       if (historyCleared) console.log("[log] conversation history cleared (asked for by voice)");
-      else logTurn({ user: text, reply, usedTools, ms: Date.now() - started });
+      else logTurn({ user: text, reply, usedTools, ms: Date.now() - started, firstMs: firstAt, timing });
 
       send({ type: "done", reply, usedTools });
       return res.end();
@@ -993,6 +995,17 @@ server.listen(PORT, "127.0.0.1", async () => {
   });
   startAlertWatch(config);
 
+  // The weather, fetched before anyone asks for it.
+  //
+  // "What's the weather?" is the commonest question he gets and very often the
+  // FIRST, which his log shows is exactly when it was slowest. Both answers are
+  // cached for ten and fifteen minutes (lib/weather.js, lib/airquality.js), and
+  // a question arriving while these are still in flight shares the same request
+  // rather than making its own. Fire and forget: a failure here costs nothing
+  // but the head start.
+  getWeather(config).catch(() => {});
+  getAirQuality(config).catch(() => {});
+
   // --- Channels somebody dropped into channels/ ----------------------------
   //
   // The folder IS the registration, the way personas/ and voices/ already work.
@@ -1104,6 +1117,17 @@ server.listen(PORT, "127.0.0.1", async () => {
     for (const line of platform.missing) console.log(`    - ${line}`);
     console.log(`  ${platform.help}\n`);
   }
+
+  // Start loading the brain NOW, before the window even opens, rather than only
+  // when "Wake Greg" is clicked. The wake-time warm-up takes ~8.7 s against ~6.8 s
+  // of boot animation, so a question asked straight after waking waited for the
+  // model to finish loading - and the first question of a session was the slow
+  // one in his log every time. Starting here adds the whole time it takes to
+  // open the window and click Wake to the head start. The wake still fires its
+  // own warm-up, which simply finds the model loaded. Fire and forget, like it.
+  warmBrain().then(({ warmed, reason }) => {
+    console.log(warmed ? `[brain] pre-loaded at startup (${reason})` : `[brain] not pre-loaded at startup: ${reason}`);
+  });
 
   if (config.openBrowser !== false) openBrowser(url);
 });
