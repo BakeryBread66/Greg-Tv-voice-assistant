@@ -11,7 +11,7 @@ Every setting, where it lives, and which ones need a restart.
 Greg's conversation runs on **Ollama**, which hosts a language model locally on your GPU. It's already installed and configured. Greg picks a brain automatically at startup:
 
 1. **Local model via Ollama** — the default. No key, no account, works offline.
-2. **Claude** — only if you've put an `ANTHROPIC_API_KEY` in a `.env` file. Optional; you don't need one.
+2. **Claude** — only if you set `"provider": "anthropic"` in `config.json` **and** put an `ANTHROPIC_API_KEY` in a `.env` file. Optional; you don't need one. The default, `"auto"`, never picks it.
 3. **Basic mode** — if Ollama isn't running, he still does weather, news, and time by phrase matching.
 
 If Ollama ever isn't running, start it from the Start Menu (or run `ollama serve`) and restart Greg.
@@ -172,6 +172,10 @@ slider moves, because both go through the same place.
   },
 
   "provider": "auto",            // "auto" | "ollama" | "anthropic"
+                                 // "auto" = the model on this PC, never the
+                                 // cloud. "anthropic" = Claude, which shows a
+                                 // CLAUDE · CLOUD badge in the title bar the
+                                 // whole time it is in use.
   "ollama": {
     "model": "gemma4:e4b",
     "think": "auto",             // see the warning above
@@ -220,7 +224,14 @@ Greg guesses your location from your IP, which a VPN will throw off. To pin it, 
 
 ## Optional: using Claude instead
 
-Greg doesn't need this — the local model handles everything. But if you ever get an Anthropic API key, copy `.env.example` to `.env`, paste the key in, and restart. Greg will prefer it automatically. To force the local model even with a key present, set `"provider": "ollama"`.
+Greg doesn't need this — the local model handles everything. If you want Claude anyway, it takes two steps, on purpose:
+
+1. Copy `.env.example` to `.env` and paste an Anthropic API key in.
+2. Set `"provider": "anthropic"` in `config.json`, and restart.
+
+A key on its own does nothing. `"auto"` used to prefer Claude whenever a key was present, which made a key in `.env` a switch that silently sent every conversation to Anthropic — and because the brain is chosen once at startup, an Ollama that was slow to start could do the same for a whole session. Now leaving the PC is something you ask for by name, and the console says so if a key is set but unused.
+
+**While Claude is the brain, the window says so the whole time**: an amber **☁ CLAUDE · CLOUD** badge in the title bar, and a line in the status bar. Hover either one for what is sent — what you say, the facts he remembers about you, where you are, and whatever his tools fetch. The boot screen marks the brain amber rather than `[ OK ]`, and its tagline reads *Some processing remote*. The same badge appears if an Ollama brain is not on this PC either — `ollama.url` pointing at another machine, or one of Ollama's `-cloud` models.
 
 ---
 

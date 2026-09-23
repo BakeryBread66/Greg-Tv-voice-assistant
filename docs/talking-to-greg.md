@@ -271,6 +271,7 @@ Two related habits, both automatic:
 | "Hey Greg, what timers do I have?" / "cancel the pasta one" | Lists or cancels them |
 | "Hey Greg, remember that my dog is called Rex" | Remembers it **permanently**, across restarts |
 | "Hey Greg, forget about my dog" | Deletes it again |
+| "Hey Greg, clear our conversation history" | Deletes the log of everything you've said to him. The facts he remembers stay unless you ask him to forget those too |
 | "Hey Greg" *(then pause)* | Waits, listening, for your actual question |
 | *(straight after he answers)* "and tomorrow?" | Follow-up — no wake word needed for seven seconds |
 | *(while he's talking)* anything | Cuts him off and listens |
@@ -278,7 +279,9 @@ Two related habits, both automatic:
 
 ### Memory
 
-Anything Greg remembers about you lives in **`memory.json`** in the Greg folder — plain text you can read, edit, or delete yourself. It survives restarts. The ⟲ button clears the current *conversation*, not this.
+Anything Greg remembers about you lives in **`memory.json`** in the Greg folder — plain text you can read, edit, or delete yourself. It survives restarts. The ⟲ button clears the current *conversation*, not this. "Forget about my dog" removes only the facts that mention a dog; a request too vague to pick one out ("forget that") removes nothing, and he asks which you mean.
+
+Separately, he keeps a word-for-word log of every conversation in **`conversations.jsonl`**, which is what lets him answer "what did we talk about yesterday?". It keeps 90 days (`conversationLog.keepDays`). **"Clear our conversation history"** empties it and starts the current conversation fresh; he only does it when you ask in so many words, and if he ever answers that request without actually clearing it, he corrects himself out loud. The two are separate on purpose: wiping the log does not make him forget your dog's name, and forgetting the dog does not wipe the log.
 
 Timers and reminders live in **`reminders.json`** and also survive a restart: anything still in the future is re-armed when Greg starts, and anything that came due while he was switched off is announced when he's back, flagged as late.
 

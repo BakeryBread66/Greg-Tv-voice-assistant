@@ -13,6 +13,7 @@ import { clampVolume, stepVolume, volumeLabel } from "./volume.js";
 import { sentenceAt } from "./subtitles.js";
 import { playEarcon, playStrike, playPost, tubeWhine } from "./earcon.js";
 import { micProblem as micProblemFor, hasAddressBar } from "./mic-help.js";
+import { showBrainPlace } from "./brain-place.js";
 
 const el = {
   canvas: document.getElementById("face"),
@@ -33,6 +34,15 @@ const el = {
   gamingBtn: document.getElementById("gaming-btn"),
   badge: document.getElementById("badge"),
 };
+
+// Where the brain runs, painted the moment the page opens — BEFORE "Wake Greg"
+// is clicked and the microphone is open, because that is the moment somebody
+// deciding whether to talk to him needs to know it. Fire and forget: wake() and
+// comeOnline() repaint it from their own fetches.
+fetch("/api/config")
+  .then((res) => res.json())
+  .then((info) => showBrainPlace(info))
+  .catch(() => {});
 
 // Top-level await: the 3D renderer is loaded on demand, and everything below
 // depends on having a face to talk to.
@@ -282,6 +292,7 @@ async function comeOnline() {
 
   el.badge.textContent = config.hasBrain ? `${config.location?.city ?? ""}`.trim() || "online" : "basic mode";
   el.badge.classList.toggle("warn", !config.hasBrain);
+  showBrainPlace(config);
   el.hint.textContent = `Say “Hey ${config.name}”, then ask for the weather or the local news.`;
 
   setMode("idle");
@@ -2162,6 +2173,7 @@ async function wake() {
   el.badge.textContent = config.hasBrain ? `${config.location?.city ?? ""}`.trim() || "online" : "basic mode";
   el.badge.title = config.brainLabel ?? "";
   el.badge.classList.toggle("warn", !config.hasBrain);
+  showBrainPlace(config);
 
   // The set warms up while the microphone, the worklet and the settings are
   // still being fetched below — so most of these four seconds are spent on work

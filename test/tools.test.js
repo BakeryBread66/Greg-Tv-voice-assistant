@@ -19,7 +19,7 @@ const EXPECTED = [
   "play_music", "play_podcast", "whats_playing", "get_market", "control_playback",
   "set_personality", "get_personality", "set_persona", "set_vision", "set_gaming_mode",
   "set_channel", "get_current_time", "search_web", "read_page", "open_website",
-  "recall_conversation", "remember_about_user", "forget_about_user", "explain_last_answer",
+  "recall_conversation", "remember_about_user", "forget_about_user", "clear_conversation_history", "explain_last_answer",
   "set_reminder", "list_reminders", "cancel_reminder", "get_engineering",
   "read_file",
 ];
@@ -88,12 +88,15 @@ test("the schemas stay affordable", () => {
 // suite went green on a tool that changes the world, and only the token budget
 // failing gave it away. Any new verb that writes state belongs in this pattern
 // in the same change that introduces it.
-const WRITES = /^(set_|play_|cancel_|remember_|forget_|take_|control_|open_)/;
+// `clear_` joined with clear_conversation_history, for the same reason `open_`
+// joined with open_website.
+const WRITES = /^(set_|play_|cancel_|remember_|forget_|clear_|take_|control_|open_)/;
 const COVERED = {
   set_reminder: "setting a timer",
   cancel_reminder: "cancelling one",
   remember_about_user: "saving or forgetting a fact",
   forget_about_user: "saving or forgetting a fact",
+  clear_conversation_history: "clearing the conversation history",
   take_screenshot: "taking a screenshot",
   play_music: "playing or pausing music",
   play_podcast: "podcast",

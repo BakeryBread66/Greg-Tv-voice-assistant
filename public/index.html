@@ -17,6 +17,11 @@
         <div class="title-bar">
           <span class="title-icon" aria-hidden="true"></span>
           <span class="title-text">Greg</span>
+          <!-- Shown whenever the brain is NOT on this PC — Claude, or an Ollama
+               somewhere else. Filled in by public/brain-place.js from
+               /api/config; hidden, and so absent, when he is thinking locally.
+               In the title bar because nothing ever covers it. -->
+          <span id="cloud-brain" class="cloud-brain" role="status" hidden></span>
           <!-- Window furniture: decoration, not controls. Hidden from screen
                readers and unclickable, so nothing promises what it can't do. -->
           <span class="title-buttons" aria-hidden="true">
@@ -67,7 +72,7 @@
 
         <div class="status-bar">
           <span id="badge" class="status-panel badge">connecting…</span>
-          <span class="status-panel status-panel-grow"></span>
+          <span id="brain-where" class="status-panel status-panel-grow"></span>
         </div>
 
         <!-- Settings. A properties dialog over the window, which is what Windows

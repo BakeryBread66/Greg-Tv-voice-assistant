@@ -135,6 +135,32 @@ body[data-mode="offline"] .title-bar {
   letter-spacing: 0.2px;
 }
 
+/* The brain is not on this PC. Amber on the blue title bar, because it has to
+   be read at a glance from across a room and the title bar is the one strip of
+   the window nothing ever covers — not the wake dialog, not Settings. Built as
+   a raised Win98 panel like everything else, so it looks like part of the set
+   rather than a web banner, but it is the loudest thing on it on purpose.
+   Hidden by the `hidden` attribute when he is thinking locally. */
+.cloud-brain {
+  flex: none;
+  height: 14px;
+  padding: 0 5px;
+  line-height: 12px;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  color: var(--ink);
+  background: #ffc800;
+  border: 1px solid;
+  border-color: var(--white) var(--dark) var(--dark) var(--white);
+  cursor: help;
+}
+
+.cloud-brain[hidden] {
+  display: none;
+}
+
 .title-buttons {
   display: flex;
   gap: 2px;
@@ -444,6 +470,14 @@ body[data-mode="offline"] .title-bar {
 .badge.warn {
   color: #800000;
   font-weight: bold;
+}
+
+/* The status bar's long panel, when it is saying where the brain went. The
+   same dark red as a warning badge, so the two read as one family. */
+.status-panel.cloud {
+  color: #800000;
+  font-weight: bold;
+  cursor: help;
 }
 
 /* ---------------------------------------------------------------------------

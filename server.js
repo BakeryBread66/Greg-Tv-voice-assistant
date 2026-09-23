@@ -246,6 +246,12 @@ const server = http.createServer(async (req, res) => {
         bargeIn: config.bargeIn ?? { enabled: true, sustainMs: 350 },
         hasBrain: brain.active,
         brainLabel: brain.label,
+        // Where the brain runs, so the window can say so the whole time rather
+        // than only in the boot screen. public/brain-place.js turns these into
+        // the title-bar badge; false means every word goes somewhere else.
+        brainKind: brain.kind ?? null,
+        brainOnThisMachine: brain.onThisMachine,
+        brainService: brain.service,
         // Coordinates as well as the name, so the globe can drop a home marker.
         location: { city: loc.city, region: loc.region, latitude: loc.latitude, longitude: loc.longitude },
         // "local" = offline Whisper on this machine, "browser" = Chrome's cloud service
@@ -270,11 +276,14 @@ const server = http.createServer(async (req, res) => {
 
       console.log(`\n[you]  ${text}`);
       const started = Date.now();
-      const { reply, usedTools } = await think(String(text).trim(), history, config, null, awaySeconds);
+      const { reply, usedTools, historyCleared } = await think(String(text).trim(), history, config, null, awaySeconds);
       console.log(`[greg] ${reply}`);
       if (usedTools.length) console.log(`       (used: ${usedTools.join(", ")}, ${Date.now() - started}ms)`);
 
-      logTurn({ user: text, reply, usedTools, ms: Date.now() - started });
+      // The turn that cleared the log is not written back into it: "clear my
+      // history" should leave an empty log, not one line saying it was cleared.
+      if (historyCleared) console.log("[log] conversation history cleared (asked for by voice)");
+      else logTurn({ user: text, reply, usedTools, ms: Date.now() - started });
       return sendJson(res, 200, { reply, usedTools });
     }
 
@@ -305,7 +314,7 @@ const server = http.createServer(async (req, res) => {
         }
       };
 
-      const { reply, usedTools } = await think(
+      const { reply, usedTools, historyCleared } = await think(
         String(text).trim(),
         history,
         config,
@@ -325,8 +334,10 @@ const server = http.createServer(async (req, res) => {
       console.log(`       (${detail.join(", ")})`);
 
       // After the reply is out, never before: this touches the disk and the
-      // streaming path measures its own time to first sentence.
-      logTurn({ user: text, reply, usedTools, ms: Date.now() - started });
+      // streaming path measures its own time to first sentence. Skipped for the
+      // turn that cleared the log, for the reason given in /api/chat above.
+      if (historyCleared) console.log("[log] conversation history cleared (asked for by voice)");
+      else logTurn({ user: text, reply, usedTools, ms: Date.now() - started });
 
       send({ type: "done", reply, usedTools });
       return res.end();
@@ -379,14 +390,19 @@ const server = http.createServer(async (req, res) => {
     }
 
     // A verbatim record of everything said needs a way to look at it and a way
-    // to destroy it. Both live here rather than behind a tool, because neither
-    // is something the model should be doing on its own initiative.
+    // to destroy it. The model still cannot do either on its own initiative:
+    // clear_conversation_history exists now, but it refuses unless the user's
+    // own words that turn asked for it — see wantsHistoryCleared.
     if (url.pathname === "/api/conversations" && req.method === "GET") {
       return sendJson(res, 200, conversationStats());
     }
 
     if (url.pathname === "/api/conversations" && req.method === "DELETE") {
       const result = clearConversations();
+      // The conversation in memory goes too, the same as the voice path —
+      // otherwise the log is empty and the last dozen exchanges are still in
+      // his context, ready to be repeated.
+      if (result.ok) history.length = 0;
       console.log("[log] conversation history cleared");
       return sendJson(res, result.ok ? 200 : 500, result);
     }
@@ -973,7 +989,11 @@ server.listen(PORT, "127.0.0.1", async () => {
 
     Face:     ${url}
     Location: ${loc.city}${loc.region ? `, ${loc.region}` : ""}
-    Brain:    ${brain.label}
+    Brain:    ${brain.label}${
+      brain.active && !brain.onThisMachine
+        ? `\n              ^ NOT ON THIS PC: what you say is sent to ${brain.service}.`
+        : ""
+    }
     Ears:     ${earsReady ? `${ears.model} on ${ears.device} (on this PC)` : "browser speech recognition (needs internet)"}
     Voice:    ${
       cloneReady

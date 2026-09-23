@@ -72,6 +72,19 @@ a deny list that wins over the allow list, and paths are resolved with `realpath
 `screenshots/` are all gitignored. If you fork this and push, check `git status`
 before your first commit anyway.
 
+**The brain leaves the machine only if you name it.** `"provider": "auto"`, the
+default, runs the local model and nothing else — a key in `.env` is not enough
+to switch to Claude. With `"provider": "anthropic"` everything said to him goes
+to Anthropic, and the window shows an amber **CLAUDE · CLOUD** badge in the
+title bar for as long as that is true. The same badge appears for an Ollama
+brain that is not on this PC.
+
+**Deleting is gated on your words.** Clearing the conversation log by voice only
+works when what you said that turn asked for it; nothing he reads — a web page,
+a file — can grant it, and if he claims to have cleared it without doing so he
+is corrected in code. Forgetting a fact removes only the facts every
+significant word of the request appears in, so a vague request removes nothing.
+
 **Some things do leave the machine, when you ask for them.** Search terms go to
 DuckDuckGo, coordinates go to the weather services, and place names go to the
 news feed. Your audio, your screen and your conversation do not — provided the

@@ -22,6 +22,8 @@
 // the head and the glass, scanlines and shadow mask land on top of it — which is
 // most of why it reads as a screen rather than as an animation.
 
+import { brainPlace } from "./brain-place.js";
+
 // The Win98 palette, which is genuinely these values and not an approximation.
 const SILVER = "#c0c0c0";
 const WHITE = "#ffffff";
@@ -63,7 +65,11 @@ const ROWS = 16;
  * it mattered. It is derived from the same three facts as the device list now.
  */
 export function tagline(info = {}) {
-  const local = Boolean(info.hasBrain) && info.listening === "local" && info.speaking === "local";
+  // The brain has to be ON THIS PC, not merely present. Claude is a brain too,
+  // and before this the screen said "All processing local" over a session that
+  // was sending every word to Anthropic.
+  const local =
+    Boolean(info.hasBrain) && !brainPlace(info) && info.listening === "local" && info.speaking === "local";
   return local ? "All processing local" : "Some processing remote";
 }
 
@@ -71,7 +77,18 @@ export function deviceLines(info = {}) {
   const rows = [];
   const add = (label, value, ok) => rows.push({ label, value, ok });
 
-  add("Brain", info.hasBrain ? info.brainLabel || "local model" : "not found", Boolean(info.hasBrain));
+  // A brain somewhere else is present and working, and still not [ OK ] on a
+  // screen whose whole claim is what runs here — the same amber the cloud
+  // voice and browser ears get. Its value is short on purpose: the full label
+  // ("claude-opus-5 (Claude, on Anthropic's servers)") ran straight through the
+  // status column when rendered. The badge's tooltip carries the detail.
+  const away = brainPlace(info);
+  const brainValue = !info.hasBrain
+    ? "not found"
+    : away
+      ? away.claude ? "Claude (cloud)" : "not on this PC"
+      : info.brainLabel || "local model";
+  add("Brain", brainValue, Boolean(info.hasBrain) && !away);
   add(
     "Ears",
     info.listening === "local" ? info.earsLabel || "Whisper" : "browser speech",

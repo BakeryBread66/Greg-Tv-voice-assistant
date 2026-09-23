@@ -104,6 +104,21 @@ It presents as Greg being randomly slow, because it depends on how long since
 you last spoke to him rather than on anything you did. It costs a few GB of
 video memory held between conversations. `"-1"` never unloads.
 
+## 6. `provider: "auto"` never means Claude
+
+It looks like "auto" should pick the best brain available, and it used to: a
+key in `.env` made it prefer Claude. That made the key a switch that silently
+sent every conversation to Anthropic, and because the brain is chosen **once,
+at startup**, an Ollama that was still loading when Greg started could do the
+same for a whole session — with nothing in the window to say so.
+
+So "auto" is the local model or basic mode, and leaving the PC takes
+`"provider": "anthropic"` by name. When it is chosen, an amber badge sits in the
+title bar for as long as it is true (`public/brain-place.js`), the boot screen
+marks the brain amber, and its tagline stops claiming everything is local.
+**Do not "fix" basic mode by falling back to the cloud.** Basic mode is the
+honest fallback: it runs here and says it is limited.
+
 ---
 
 ## A known defect: the sentence gap overwrites Piper's own phrasing
@@ -200,6 +215,7 @@ had oscillated:
 | Saying how old an article is | reached the model every time, stated 2/6 | append it in code — 6/6 |
 | Claiming a reminder was set | named in the honesty rule, still failed 1 in 3 | check the request, correct in code |
 | Empty weather-alert list read as "no alerts" | a note in the tool result, failed 1 in 3 | remove the ambiguity — 5/5 |
+| "Clear my history" answered by forgetting facts | no tool existed; he said it was cleared 3/3 times | a gated tool, and a correction when it is not called |
 
 The pattern is always the same: **a personality or brevity instruction beats a
 prompt instruction**, and a model handed an empty list fills the silence.

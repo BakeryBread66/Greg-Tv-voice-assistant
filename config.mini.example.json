@@ -147,6 +147,7 @@
     "temperature": "fahrenheit",
     "windSpeed": "mph"
   },
+  "_providerComment": "auto = the model on this PC through Ollama, and never anything else. anthropic = Claude on Anthropic's servers, which also needs ANTHROPIC_API_KEY in .env; while it is the brain the window shows an amber CLAUDE - CLOUD badge in the title bar.",
   "provider": "auto",
   "model": "claude-opus-5",
   "effort": "low",
