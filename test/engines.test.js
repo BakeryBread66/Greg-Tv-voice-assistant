@@ -48,6 +48,20 @@ test("whisper.cpp counts as installed only with its server, its model and its VA
   assert.equal(whisperEngine("base.en", { root: path.join(DIR, "nothing") }), null);
 });
 
+test("the platform asked about decides the server's name, not the one running the test", () => {
+  // CI on Linux asked survey() about Windows, and whisperEngine looked for the
+  // Linux name — a Windows install read as "partial". Caught on Linux only.
+  const root = path.join(DIR, "platforms");
+  const p = enginePaths(root);
+  fs.mkdirSync(p.whisperDir, { recursive: true });
+  fs.mkdirSync(p.modelsDir, { recursive: true });
+  fs.writeFileSync(path.join(p.whisperDir, "whisper-server.exe"), "");
+  fs.writeFileSync(path.join(p.modelsDir, "ggml-base.en.bin"), "");
+  fs.writeFileSync(path.join(p.modelsDir, VAD_MODEL), "");
+  assert.ok(whisperEngine("base.en", { root, platform: "win32" }));
+  assert.equal(whisperEngine("base.en", { root, platform: "linux" }), null);
+});
+
 test("the CPU build is told apart from the GPU one", () => {
   const root = path.join(DIR, "cpu");
   install(root, { build: "cpu" });
