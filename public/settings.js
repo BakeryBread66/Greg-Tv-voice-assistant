@@ -13,6 +13,7 @@
 // wake.js and mic-help.js exist.
 import { spotifyGuidance } from "./spotify-help.js";
 import { hotkeyFromEvent, hotkeyProblem, normaliseHotkey } from "./hotkey.js";
+import { openSetup } from "./setup.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -109,6 +110,11 @@ export function initSettings({ onApply, micReader, listMicrophones, switchMicrop
       event.preventDefault();
       saveBrainKey();
     }
+  });
+
+  $("set-setup")?.addEventListener("click", () => {
+    close();
+    openSetup();
   });
 
   $("mem-add")?.addEventListener("click", addFact);

@@ -21,11 +21,13 @@ If Ollama ever isn't running, start it from the Start Menu (or run `ollama serve
 
 Greg hears you with **Whisper**, running locally on your GPU. Nothing you say is sent anywhere.
 
-At startup he launches `whisper_server.py`, which keeps the model loaded so each transcription is fast. The console shows which is active:
+At startup he launches **whisper.cpp** (`engines/whisper/whisper-server.exe`), which keeps the model loaded so each transcription is fast — no Python needed. The setup screen installs it: the graphics-card build if you have a recent NVIDIA driver, the processor build otherwise. If it isn't installed he uses the Python `whisper_server.py` instead, as he always did. The console shows which is active:
 
 ```
-Ears:     base.en on cuda (offline)
+Ears:     base.en on NVIDIA GeForce RTX 4090, whisper.cpp (on this PC)
 ```
+
+The two were measured on the same 768 clips before switching: the same accuracy (3.8% word errors against 3.6%, and better with background noise), in half the time — 29 ms a clip on the GPU, 348 ms on the processor. The full comparison is in [bench/speech](../bench/speech/README.md).
 
 The browser holds a rolling buffer of microphone audio and watches the signal level to spot when you start and stop talking, then sends just that slice for transcription. The buffer matters: speech is only detected a fraction of a second *after* it begins, so without a bit of history the word "Hey" gets clipped off the front.
 
@@ -69,11 +71,24 @@ That middle step matters more than it looks: without it, a hiccup in the local v
 ```jsonc
 "localVoice": {
   "enabled": true,                 // false = always use the cloud voice
+  "engine": "auto",                // "sherpa" (in Greg, no Python), "python", or
+                                   // "auto": sherpa when installed, else Python
   "voice": "en_US-ryan-high",      // see the voice list below
   "speed": 1.0,                    // 1.15 faster, 0.9 slower
   "port": 4749
+},
+"speech": {
+  "engine": "auto",                // "whisper.cpp", "python", or "auto": whisper.cpp
+                                   // when installed, else the Python sidecar
+  "model": "base.en"
 }
 ```
+
+**His voice runs inside Greg now**, through sherpa-onnx, with no Python and no
+separate program. It is the same Piper voice — Greg converts your existing voice
+files for it himself, in a fraction of a second — and was measured as fast (276
+ms a sentence against 298) and as clear. To go back to the Python engines for
+either, set its `engine` to `"python"`.
 
 
 ## Settings

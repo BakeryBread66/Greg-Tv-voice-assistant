@@ -87,7 +87,20 @@ lend, and none of the four engines can target one.
 
 ## Setting him up
 
-Double-click **`setup-greg.bat`**. It looks at what your machine already has,
+**The simple way: start him.** On a first run that is missing something, Greg
+opens a **Setting Greg up** screen in his own window. It says what your PC has —
+graphics card, Ollama — and lists what he still needs with the size of each:
+his brain (through Ollama), his hearing (whisper.cpp, the GPU or CPU build to
+suit your card), and his voice. Press **Install** and watch the progress bars;
+when it finishes he is using them, no restart. Every file is checked against its
+publisher's SHA-256 before it is used, and **none of it needs Python**. Settings →
+General → *Check what's installed…* opens the same screen any time.
+
+It needs Node.js already, and installs Ollama with winget if it isn't there.
+The one thing it cannot do is the cloned voice, which still needs Python — see
+below.
+
+**The detailed way:** double-click **`setup-greg.bat`**. It looks at what your machine already has,
 asks which pieces you want with the download size next to each, installs them,
 and then tells you honestly what worked.
 

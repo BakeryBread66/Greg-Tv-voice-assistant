@@ -8,6 +8,7 @@ import { createFace } from "./face.js";
 import { LocalListener } from "./listen-local.js";
 import { initSettings, paintSettings } from "./settings.js";
 import { isHotkey } from "./hotkey.js";
+import { initSetup, maybeOpenSetup, onSetupEvent } from "./setup.js";
 import { normalize, afterWakeWord as matchWakeWord, isFiller, isCancel as matchCancel, isReplay, namesFrom, keepsListening } from "./wake.js";
 import { createVocoder } from "./vocoder.js";
 import { clampVolume, stepVolume, volumeLabel } from "./volume.js";
@@ -361,6 +362,11 @@ function connectEventStream() {
       el.badge.title = config.brainLabel ?? "";
       el.badge.classList.toggle("warn", !config.hasBrain);
       showBrainPlace(config);
+      return;
+    }
+    // A setup run's progress, from lib/setup.js via the server.
+    if (String(payload.type).startsWith("setup")) {
+      onSetupEvent(payload);
       return;
     }
     // Greg.exe heard the push-to-talk key, in whatever program you were in.
@@ -2008,6 +2014,7 @@ function adoptSettings(state) {
   if (mode === "idle" || mode === "off") setMode(mode);
 }
 
+initSetup();
 initSettings({
   onApply: adoptSettings,
   listMicrophones,
@@ -2339,6 +2346,8 @@ async function wake() {
   updateMicButton();
   startHeartbeat();
   connectEventStream();
+  // A first run that is missing something opens the setup screen, once.
+  maybeOpenSetup();
   // Last, so it owns the hint line rather than being overwritten by whichever
   // listening path was chosen above.
   startMicDebug();

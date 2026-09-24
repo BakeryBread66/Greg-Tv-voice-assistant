@@ -48,7 +48,9 @@ done
 
 # Then sweep for sidecars a previous bad shutdown may have orphaned. By name.
 helpers=0
-for script in whisper_server.py piper_server.py clone_server.py; do
+# engines/whisper/whisper-server is whisper.cpp, which replaces whisper_server.py
+# when it is installed; the path keeps it to this Greg's own copy.
+for script in whisper_server.py piper_server.py clone_server.py engines/whisper/whisper-server; do
   if command -v pkill >/dev/null 2>&1; then
     # -f matches the full command line; the script name is specific enough that
     # this cannot match anything else, and pkill excludes itself.

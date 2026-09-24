@@ -961,6 +961,27 @@ body[data-mode="offline"] .title-bar {
   text-align: center;
 }
 
+/* The setup screen shows every step at once: seven rows, not the Memory tab's
+   four-and-scroll. */
+.setup-steps {
+  max-height: 320px;
+}
+
+/* The setup screen's progress bars: the microphone meter's look, in each row. */
+.setup-meter {
+  flex: 1 1 100%;
+  height: 10px;
+  margin: 2px 0 4px;
+}
+
+.setup-meter .meter-fill.busy {
+  opacity: 0.5;
+}
+
+.mem-list .mem-when.bad {
+  color: #800000;
+}
+
 /* The Brain tab: its one action button sits on its own row, right-aligned. */
 .brain-buttons {
   padding: 0 0 8px;

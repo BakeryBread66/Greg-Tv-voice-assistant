@@ -82,6 +82,31 @@
              Only settings that take effect without restarting him are here; see
              lib/settings.js for why. A control that silently does nothing until
              you restart is worse than no control. -->
+        <!-- Setting Greg up: what this PC has, what he still needs, and a progress
+             bar for each download. public/setup.js; the work is lib/setup.js. -->
+        <div id="setup" class="overlay settings-overlay" hidden>
+          <div class="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+            <div class="dialog-title">
+              <span id="setup-title">Setting Greg up</span>
+              <button id="setup-x" class="title-btn title-btn-close" title="Close" aria-label="Close">&#10005;</button>
+            </div>
+            <div class="dialog-body tab-body">
+              <p id="setup-machine" class="field-note"></p>
+              <ul id="setup-steps" class="results mem-list setup-steps"></ul>
+              <label id="setup-eyes-row" class="check" hidden>
+                <input id="setup-eyes" type="checkbox" /> Also let him see my screen when I ask
+              </label>
+              <p id="setup-total" class="field-note"></p>
+              <p class="field-note">Everything is checked against its publisher's fingerprint before it is used. Nothing is sent anywhere.</p>
+              <p id="setup-problem" class="settings-problem" hidden></p>
+            </div>
+            <div class="dialog-buttons">
+              <button id="setup-go" class="btn btn-default" type="button">Install</button>
+              <button id="setup-later" class="btn" type="button">Not now</button>
+            </div>
+          </div>
+        </div>
+
         <div id="settings" class="overlay settings-overlay" hidden>
           <div class="dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
             <div class="dialog-title">
@@ -108,6 +133,11 @@
                   <input id="set-name" type="text" maxlength="30" spellcheck="false" />
                 </label>
                 <p class="field-note">Changing this changes what he answers to. Add a matching wake word below.</p>
+
+                <div class="search-row">
+                  <button id="set-setup" class="btn" type="button">Check what's installed…</button>
+                </div>
+                <p class="field-note">His brain, hearing and voice: what this PC has, and anything missing, downloaded here.</p>
 
                 <label class="field">
                   <span>Wake words</span>

@@ -819,14 +819,16 @@ namespace Greg
         // Named rather than taken as a process tree. If Greg's server was the one
         // that started Chrome, Chrome is its child, and a tree kill would close
         // every tab you have open along with him.
-        static readonly string[] Sidecars = { "whisper_server.py", "piper_server.py", "clone_server.py", "media-session.ps1", "cursor-watch.ps1" };
+        // whisper-server.exe is whisper.cpp, matched by its path inside this Greg's
+        // engines folder so no other program of that name is touched.
+        static readonly string[] Sidecars = { "whisper_server.py", "piper_server.py", "clone_server.py", "media-session.ps1", "cursor-watch.ps1", "\\engines\\whisper\\whisper-server.exe" };
 
         public static void StopGreg(Process node)
         {
             try { node.Kill(); } catch (Exception) { }
             try
             {
-                string query = "SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name='python.exe' OR Name='pythonw.exe' OR Name='py.exe' OR Name='powershell.exe'";
+                string query = "SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name='python.exe' OR Name='pythonw.exe' OR Name='py.exe' OR Name='powershell.exe' OR Name='whisper-server.exe'";
                 using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(query))
                 {
                     foreach (ManagementObject found in searcher.Get())

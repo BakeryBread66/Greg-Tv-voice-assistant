@@ -19,6 +19,7 @@ import { brainState, changeBrain } from "./lib/claude-brain.js";
 import { createPhoneServer } from "./lib/phone-server.js";
 import { listPhones, removePhone, startPairing, pendingPairing, cancelPairing, vapidPublicKey, notifyPhones } from "./lib/phones.js";
 import { tailscaleState } from "./lib/tailscale.js";
+import { survey, planSteps, setupNeeded, runSetup, freeBytes } from "./lib/setup.js";
 import { initSettings, settingsState, applySettings, onSettingsChange, hotkeyState, setHotkeyStatus, saveConfig } from "./lib/settings.js";
 import { getNowPlaying, getArt, stopNowPlaying } from "./lib/nowplaying.js";
 import { getProgramme, clearProgrammes, addProgramme } from "./lib/programmes.js";
@@ -261,6 +262,60 @@ async function streamAnswer(res, { text, awaySeconds = 0, turnHistory = history,
 
 // Each paired phone's conversation, in memory like the page's own.
 const phoneHistories = new Map();
+
+// The setup run in progress, or the last one: { running, steps, progress, results }.
+let setupRun = null;
+
+async function setupState(eyes = false) {
+  const found = await survey(config);
+  const steps = setupRun?.running ? setupRun.steps : planSteps(found, { eyes });
+  return {
+    survey: found,
+    steps,
+    needed: setupNeeded(found),
+    dismissed: Boolean(config.setup?.dismissed),
+    freeBytes: freeBytes(),
+    run: setupRun,
+  };
+}
+
+async function startSetup(eyes) {
+  const found = await survey(config);
+  const steps = planSteps(found, { eyes });
+  setupRun = { running: true, steps, progress: {}, results: null };
+  broadcast({ type: "setup", run: setupRun });
+  console.log(`[setup] started: ${steps.filter((s) => !s.done).map((s) => s.id).join(", ") || "nothing to do"}`);
+
+  // A download reports every chunk; the page needs a few updates a second.
+  const lastSent = {};
+  const report = (id, update) => {
+    setupRun.progress[id] = update;
+    const now = Date.now();
+    if (update.state === "working" && update.received !== undefined && now - (lastSent[id] ?? 0) < 250) return;
+    lastSent[id] = now;
+    broadcast({ type: "setup-step", id, ...update });
+    if (update.state === "failed") console.warn(`[setup] ${id} failed: ${update.error}`);
+    if (update.state === "done") console.log(`[setup] ${id} done`);
+  };
+
+  const results = await runSetup(steps, { config, report });
+  setupRun.results = results;
+
+  // Start again whatever changed, so it is in use now rather than next time.
+  const did = (...ids) => ids.some((id) => results[id] === "done");
+  if (did("whisper", "whisperModel", "vad")) {
+    stopStt();
+    await initStt(config);
+  }
+  if (did("espeak", "voice")) {
+    stopPiper();
+    await initPiper(config);
+  }
+  if (did("ollama", "brain")) await initBrain(config);
+  setupRun.running = false;
+  broadcast({ type: "setup-done", run: setupRun, state: await setupState(eyes) });
+  console.log(`[setup] finished: ${Object.entries(results).map(([k, v]) => `${k} ${v}`).join(", ") || "nothing needed"}`);
+}
 
 const phonePort = () => Number(config.phone?.port) || 4757;
 let phoneServer = null;
@@ -634,6 +689,29 @@ const server = http.createServer(async (req, res) => {
       // dialog needs the real state back either way so it can't drift from what
       // was actually accepted.
       return sendJson(res, 200, result);
+    }
+
+    // --- Setting Greg up, from his own window ---
+    //
+    // What this PC has, what it needs, and downloading it with progress. Every
+    // file is pinned to a size and SHA-256 (lib/setup.js). When the run ends,
+    // whatever changed is started again at once — hearing, voice, brain — so a
+    // first run ends with Greg working, not with "now restart him".
+    if (url.pathname === "/api/setup" && req.method === "GET") {
+      return sendJson(res, 200, await setupState(url.searchParams.get("eyes") === "1"));
+    }
+
+    if (url.pathname === "/api/setup" && req.method === "POST") {
+      const body = await readBody(req);
+      if (body.action === "dismiss") {
+        config.setup = { ...(config.setup ?? {}), dismissed: true };
+        saveConfig();
+        return sendJson(res, 200, { ok: true });
+      }
+      if (body.action !== "run") return sendJson(res, 400, { error: "say what to do: run or dismiss" });
+      if (setupRun?.running) return sendJson(res, 409, { error: "Setup is already running." });
+      startSetup(body.eyes === true);
+      return sendJson(res, 202, { ok: true, run: setupRun });
     }
 
     // --- The Phone tab in Settings ---
@@ -1330,12 +1408,12 @@ server.listen(PORT, "127.0.0.1", async () => {
         ? `\n              ^ NOT ON THIS PC: what you say is sent to ${brain.service}.`
         : ""
     }
-    Ears:     ${earsReady ? `${ears.model} on ${ears.device} (on this PC)` : "browser speech recognition (needs internet)"}
+    Ears:     ${earsReady ? `${ears.model} on ${ears.gpu ?? ears.device}, ${ears.engine} (on this PC)` : "browser speech recognition (needs internet)"}
     Voice:    ${
       cloneReady
         ? `${cloned.reference}, cloned (on this PC)${cache.enabled ? `, ${cache.entries} cached` : ""}`
         : voiceReady
-          ? `${mouth.voice} (on this PC)`
+          ? `${mouth.voice}, ${mouth.engine} (on this PC)`
           : `${config.voice} (needs internet)`
     }
     Eyes:     ${eyes.ok ? "can read your screen" : "no screen vision"}

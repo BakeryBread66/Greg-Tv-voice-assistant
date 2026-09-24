@@ -87,3 +87,12 @@ notes/
 # Paired phones: token hashes, notification subscriptions, and the key Greg signs
 # notifications with. Never published.
 phones.json
+
+# The speech engines Greg downloads for himself: whisper.cpp, its models,
+# and sherpa-onnx's pronunciation data. Large, and never published.
+engines/
+
+# The speech benchmark's generated audio and results: remade by make_corpus.py.
+bench/speech/clips/
+bench/speech/results-*.json
+bench/speech/voice-*/

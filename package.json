@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
-    "globe.gl": "^2.46.1"
+    "globe.gl": "^2.46.1",
+    "sherpa-onnx-node": "1.13.8"
   }
 }
