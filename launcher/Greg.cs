@@ -161,6 +161,11 @@ namespace Greg
 
         public static string Request(string method, string url, int timeoutMs)
         {
+            return Request(method, url, timeoutMs, "{}");
+        }
+
+        public static string Request(string method, string url, int timeoutMs, string json)
+        {
             HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
             req.Method = method;
             req.Timeout = timeoutMs;
@@ -169,7 +174,7 @@ namespace Greg
             req.Proxy = null;
             if (method == "POST")
             {
-                byte[] body = Encoding.ASCII.GetBytes("{}");
+                byte[] body = Encoding.UTF8.GetBytes(json ?? "{}");
                 req.ContentType = "application/json";
                 req.ContentLength = body.Length;
                 using (Stream stream = req.GetRequestStream()) stream.Write(body, 0, body.Length);
@@ -359,6 +364,13 @@ namespace Greg
         volatile bool stopping;
         bool exiting;
 
+        // The push-to-talk key. See TalkKey, and the /api/hotkey note in server.js.
+        readonly TalkKey talkKey;
+        readonly System.Windows.Forms.Timer talkKeyPoll;
+        string talkKeyHeld;       // the combination claimed or tried, "" for none
+        string talkKeyProblem;    // why Windows said no, or null
+        volatile bool talkKeyAsking;
+
         public Tray(string root, Settings settings)
         {
             this.root = root;
@@ -388,6 +400,24 @@ namespace Greg
                 if (e.Button == MouseButtons.Left) Server.BringForward(settings, true);
             };
             icon.Visible = true;
+
+            // On this thread, which is the one that runs the message loop: a
+            // hotkey is delivered to the thread that registered it.
+            talkKey = new TalkKey();
+            talkKey.Pressed += delegate
+            {
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    try { Server.Request("POST", Server.Url(settings.Port, "/api/listen"), 2000); } catch (Exception) { }
+                });
+            };
+            // Asked, not told: Settings can change the key while he runs, and a
+            // key that needs Greg.exe restarting would be a control that silently
+            // does nothing - the thing lib/settings.js exists to refuse.
+            talkKeyPoll = new System.Windows.Forms.Timer();
+            talkKeyPoll.Interval = 3000;
+            talkKeyPoll.Tick += delegate { AskForTalkKey(); };
+            talkKeyPoll.Start();
 
             Thread start = new Thread(StartUp);
             start.IsBackground = true;
@@ -420,6 +450,79 @@ namespace Greg
             // The banner's first line. Until then the tooltip says he is starting,
             // which on a first run can mean several minutes of model downloads.
             if (line.Contains(" is awake.")) OnUi(delegate { icon.Text = "Greg"; });
+        }
+
+        /// <summary>Ask the server which key it wants, off this thread.</summary>
+        void AskForTalkKey()
+        {
+            if (talkKeyAsking || stopping) return;
+            talkKeyAsking = true;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    string body = Server.Request("GET", Server.Url(settings.Port, "/api/hotkey"), 1500);
+                    Dictionary<string, object> state = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(body);
+                    string key = Field(state, "key");
+                    object reported;
+                    Dictionary<string, object> status = state != null && state.TryGetValue("status", out reported)
+                        ? reported as Dictionary<string, object>
+                        : null;
+                    // The server forgets on a restart. Tell it again whenever what
+                    // it holds is not a report about this key.
+                    bool serverKnows = status != null && Field(status, "key") == key;
+                    OnUi(delegate { UseTalkKey(key, serverKnows); });
+                }
+                catch (Exception)
+                {
+                    // Not up yet, or going. The next tick asks again.
+                }
+                finally
+                {
+                    talkKeyAsking = false;
+                }
+            });
+        }
+
+        void UseTalkKey(string key, bool serverKnows)
+        {
+            if (exiting) return;
+            // A new key, or one Windows refused last time - the program holding
+            // it may have let go since.
+            bool retry = key != talkKeyHeld || talkKeyProblem != null;
+            if (!retry && serverKnows) return;
+            if (retry)
+            {
+                string before = talkKeyProblem;
+                talkKeyProblem = talkKey.Claim(key);
+                bool changed = key != talkKeyHeld || before != talkKeyProblem;
+                talkKeyHeld = key;
+                if (!changed && serverKnows) return;
+                if (key.Length > 0)
+                {
+                    Log(talkKeyProblem == null
+                        ? "Talk key " + key + " works in every program."
+                        : "Talk key " + key + " only works in Greg's window: " + talkKeyProblem);
+                }
+            }
+            if (key.Length == 0) return;
+
+            Dictionary<string, object> report = new Dictionary<string, object>();
+            report["key"] = key;
+            report["claimed"] = talkKeyProblem == null;
+            report["problem"] = talkKeyProblem ?? "";
+            string json = new JavaScriptSerializer().Serialize(report);
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try { Server.Request("POST", Server.Url(settings.Port, "/api/hotkey"), 2000, json); } catch (Exception) { }
+            });
+        }
+
+        static string Field(Dictionary<string, object> map, string name)
+        {
+            object value;
+            if (map == null || !map.TryGetValue(name, out value) || value == null) return "";
+            return Convert.ToString(value);
         }
 
         void Balloon(string title, string text)
@@ -591,6 +694,8 @@ namespace Greg
         {
             if (exiting) return;
             exiting = true;
+            talkKeyPoll.Stop();
+            talkKey.Dispose();
             icon.Visible = false;
             icon.Dispose();
             console.ExitWhenClosed = false;
@@ -598,6 +703,114 @@ namespace Greg
             console.Close();
             ExitThread();
         }
+    }
+
+    /// <summary>
+    /// The push-to-talk key, claimed from Windows so it works in every program.
+    ///
+    /// The page can only hear keys while its own window has focus, and a voice
+    /// assistant is usually in the corner of the screen while you work in
+    /// something else. RegisterHotKey is the one way to be told about a key
+    /// wherever you are - and Windows gives each combination to one program
+    /// only, so Claim can fail, and says why when it does.
+    ///
+    /// The combination is spelled the way public/hotkey.js writes it, which is
+    /// the only thing the server will store: "Ctrl+Alt+G", "F9", "Pause".
+    /// </summary>
+    sealed class TalkKey : NativeWindow, IDisposable
+    {
+        const int WM_HOTKEY = 0x0312;
+        const int Id = 0x4752;
+        const uint MOD_ALT = 1, MOD_CONTROL = 2, MOD_SHIFT = 4, MOD_WIN = 8, MOD_NOREPEAT = 0x4000;
+
+        public event MethodInvoker Pressed;
+        bool registered;
+
+        public TalkKey()
+        {
+            // A message-only window: it has a queue for WM_HOTKEY and nothing
+            // to see, so it never appears in Alt+Tab or on the taskbar.
+            CreateParams cp = new CreateParams();
+            cp.Parent = new IntPtr(-3);
+            CreateHandle(cp);
+        }
+
+        /// <summary>Claim this combination, giving up the last one. Null if it worked, else why not.</summary>
+        public string Claim(string combo)
+        {
+            Release();
+            if (string.IsNullOrEmpty(combo)) return null;
+            uint mods;
+            Keys key;
+            if (!Parse(combo, out mods, out key)) return "Greg.exe does not know the key " + combo + ".";
+            // NOREPEAT: holding the key down is one press, not thirty.
+            if (!RegisterHotKey(Handle, Id, mods | MOD_NOREPEAT, (uint)key))
+                return "another program is already using " + combo + ".";
+            registered = true;
+            return null;
+        }
+
+        public void Release()
+        {
+            if (!registered) return;
+            UnregisterHotKey(Handle, Id);
+            registered = false;
+        }
+
+        public static bool Parse(string combo, out uint mods, out Keys key)
+        {
+            mods = 0;
+            key = Keys.None;
+            foreach (string raw in combo.Split('+'))
+            {
+                string part = raw.Trim();
+                if (part == "Ctrl") mods |= MOD_CONTROL;
+                else if (part == "Alt") mods |= MOD_ALT;
+                else if (part == "Shift") mods |= MOD_SHIFT;
+                else if (part == "Win") mods |= MOD_WIN;
+                else if (key != Keys.None) return false;
+                else if (part.Length == 1 && part[0] >= '0' && part[0] <= '9') key = Keys.D0 + (part[0] - '0');
+                else if (part.Length == 1 && part[0] >= 'A' && part[0] <= 'Z') key = Keys.A + (part[0] - 'A');
+                else if (part == "ScrollLock") key = Keys.Scroll;
+                else if (part == "Space") key = Keys.Space;
+                else if (part == "Pause") key = Keys.Pause;
+                else if (part == "Insert") key = Keys.Insert;
+                else if (part == "Home") key = Keys.Home;
+                else if (part == "End") key = Keys.End;
+                else if (part == "PageUp") key = Keys.PageUp;
+                else if (part == "PageDown") key = Keys.PageDown;
+                else if (part.Length >= 2 && part[0] == 'F')
+                {
+                    int n;
+                    if (!int.TryParse(part.Substring(1), out n) || n < 1 || n > 24) return false;
+                    key = Keys.F1 + (n - 1);
+                }
+                else return false;
+            }
+            return key != Keys.None;
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_HOTKEY && m.WParam.ToInt32() == Id)
+            {
+                MethodInvoker handler = Pressed;
+                if (handler != null) handler();
+            }
+            base.WndProc(ref m);
+        }
+
+        public void Dispose()
+        {
+            Release();
+            DestroyHandle();
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+        [DllImport("user32.dll")]
+        static extern bool UnregisterHotKey(IntPtr hWnd, int id);
     }
 
     /// <summary>The last resort, when asking Greg to stop did not work.</summary>

@@ -16,7 +16,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { normalize, afterWakeWord, isFiller, isCancel, isReplay, FILLER_PHRASES } from "../public/wake.js";
+import { normalize, afterWakeWord, isFiller, isCancel, isReplay, namesFrom, followUpMode, endsWithQuestion, keepsListening, FILLER_PHRASES } from "../public/wake.js";
 import { LocalListener } from "../public/listen-local.js";
 
 // ---------------------------------------------------------------------------
@@ -101,6 +101,56 @@ test("cancelling is the whole utterance, not a word inside it", () => {
   // These are questions that happen to contain the word.
   assert.equal(isCancel("never mind the weather"), false);
   assert.equal(isCancel("stop the timer"), false);
+});
+
+test("telling him to shut up is a dismissal however it is wrapped", () => {
+  // Every one of these is from his log, and every one got an answer back.
+  for (const said of [
+    "okay okay okay shut up greg shut up",
+    "need to make it faster oh shit shut up shut up greg",
+    "shut up",
+    "Shut up, Greg.",
+    "greg be quiet",
+    "okay stop talking",
+    "stop stop stop",
+    "no stop",
+    "wait",
+    "hold on",
+    "never mind greg",
+  ]) {
+    assert.equal(isCancel(said), true, `"${said}" should silence him`);
+  }
+});
+
+test("a question or a request that merely contains a stop word is still asked", () => {
+  for (const said of [
+    "what time does the bus stop",
+    "play shut up and dance",
+    "don't forget it",
+    "is it quiet outside",
+    "wait how long is the timer",
+    "stop the music",
+    "what's the weather",
+  ]) {
+    assert.equal(isCancel(said), false, `"${said}" is a question, not a dismissal`);
+  }
+});
+
+test("filler with no dismissal in it is not a cancel", () => {
+  // isFiller owns these inside the follow-up window; a cancel would also end
+  // the window a wake word just opened.
+  assert.equal(isCancel("okay okay"), false);
+  assert.equal(isCancel("greg"), false);
+  assert.equal(isCancel(""), false);
+});
+
+test("the names he answers to come from the wake words, so a mishearing still counts", () => {
+  const names = namesFrom(["hey greg", "hey craig", "a greg"], "Greg");
+  assert.deepEqual(names.sort(), ["craig", "greg"]);
+  assert.equal(isCancel("shut up craig", names), true);
+  // Renamed in Settings: the new name is dropped the same way.
+  assert.equal(isCancel("shut up jarvis", namesFrom(["hey jarvis"], "Jarvis")), true);
+  assert.equal(isCancel("jarvis stop", namesFrom(["hey jarvis"], "Jarvis")), true);
 });
 
 // ---------------------------------------------------------------------------
@@ -404,4 +454,53 @@ test("an app window is detected by the standard property", () => {
   // Anything unexpected must read as a normal window, per the rule above.
   assert.equal(hasAddressBar({}), true);
   assert.equal(hasAddressBar(undefined), true);
+});
+
+// ---------------------------------------------------------------------------
+// Whether to keep listening after an answer
+// ---------------------------------------------------------------------------
+
+test("the follow-up mode, from settings old and new", () => {
+  assert.equal(followUpMode(undefined), "always");
+  assert.equal(followUpMode(null), "always");
+  assert.equal(followUpMode({}), "always");
+  assert.equal(followUpMode({ enabled: true, seconds: 7 }), "always");
+  assert.equal(followUpMode({ enabled: false }), "off");
+  // enabled:false wins: it can only have been written to mean off.
+  assert.equal(followUpMode({ enabled: false, mode: "always" }), "off");
+  assert.equal(followUpMode({ mode: "question" }), "question");
+  assert.equal(followUpMode({ mode: "sometimes" }), "always");
+});
+
+test("a reply that asks something is recognised, and one that doesn't is not", () => {
+  for (const reply of [
+    "Hey there. What can I help you with?",
+    "Did you want the forecast for tomorrow too?",
+    'He said "is that right?"',
+    "Want me to set one? ",
+  ]) {
+    assert.equal(endsWithQuestion(reply), true, reply);
+  }
+  for (const reply of [
+    "It's two oh nine in the afternoon.",
+    "Is it? No. It's sunny.",
+    "",
+    null,
+    undefined,
+  ]) {
+    assert.equal(endsWithQuestion(reply), false, String(reply));
+  }
+});
+
+test("each mode decides the window the way it says", () => {
+  const statement = "It's sixty-three degrees and overcast.";
+  const question = "Do you want tomorrow's too?";
+  assert.equal(keepsListening(statement, { mode: "always" }), true);
+  assert.equal(keepsListening(question, { mode: "always" }), true);
+  assert.equal(keepsListening(statement, { mode: "question" }), false);
+  assert.equal(keepsListening(question, { mode: "question" }), true);
+  assert.equal(keepsListening(question, { mode: "off" }), false);
+  assert.equal(keepsListening(question, { enabled: false }), false);
+  // How every Greg before the modes behaved.
+  assert.equal(keepsListening(statement, { enabled: true, seconds: 7 }), true);
 });

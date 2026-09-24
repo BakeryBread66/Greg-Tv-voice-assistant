@@ -1,0 +1,256 @@
+/* Greg on a phone: the same Windows 98 set as on the PC, arranged for a thumb.
+   One window filling the screen, a big button at the bottom, the conversation
+   above it. */
+
+:root {
+  --face: #c0c0c0;
+  --face-light: #dfdfdf;
+  --white: #ffffff;
+  --shadow: #808080;
+  --dark: #000000;
+  --desktop: #008080;
+  --title-a: #000080;
+  --title-b: #1084d0;
+  --ink: #000000;
+  --font: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--desktop);
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--ink);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+.window {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--face);
+  border: 2px solid;
+  border-color: var(--face-light) var(--dark) var(--dark) var(--face-light);
+  box-shadow: inset 1px 1px 0 var(--white), inset -1px -1px 0 var(--shadow);
+  padding: 3px;
+}
+
+.title-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 6px;
+  background: linear-gradient(90deg, var(--title-a), var(--title-b));
+  color: var(--white);
+  font-weight: bold;
+  flex: none;
+}
+
+.title-icon {
+  width: 20px;
+  height: 16px;
+  background: linear-gradient(90deg, #c0c0c0 0 14%, #c0c000 14% 28%, #00c0c0 28% 42%, #00c000 42% 57%, #c000c0 57% 71%, #c00000 71% 85%, #0000c0 85%);
+  border: 2px solid #c9c2af;
+  outline: 1px solid #3a352b;
+}
+
+.title-text {
+  flex: 1;
+}
+
+.state {
+  font-size: 12px;
+  font-weight: normal;
+  opacity: 0.9;
+}
+
+.state.bad {
+  color: #ffd060;
+}
+
+.panel {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+h1 {
+  font-size: 18px;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.note {
+  font-size: 13px;
+  color: #303030;
+}
+
+.problem {
+  background: #ffffe1;
+  border: 1px solid var(--dark);
+  padding: 8px;
+  color: #800000;
+}
+
+.problem[hidden],
+.note[hidden] {
+  display: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+input {
+  width: 100%;
+  padding: 8px;
+  font-family: var(--font);
+  font-size: 16px; /* 16px or iOS zooms the page on focus */
+  background: var(--white);
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark);
+  border-radius: 0;
+}
+
+.btn {
+  min-height: 40px;
+  padding: 6px 14px;
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--face);
+  border: 2px solid;
+  border-color: var(--face-light) var(--dark) var(--dark) var(--face-light);
+  box-shadow: inset 1px 1px 0 var(--white), inset -1px -1px 0 var(--shadow);
+  border-radius: 0;
+}
+
+.btn:active {
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+}
+
+.btn-default {
+  outline: 1px solid var(--dark);
+}
+
+.btn:disabled {
+  color: var(--shadow);
+}
+
+/* The conversation: a sunken well, newest at the bottom. */
+.log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  background: var(--white);
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+  box-shadow: inset 1px 1px 0 var(--dark);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.log li {
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.log .you {
+  align-self: flex-end;
+  max-width: 85%;
+  background: #e8e8ff;
+  padding: 6px 8px;
+}
+
+.log .greg {
+  max-width: 92%;
+}
+
+.log .greg::before {
+  content: "Greg: ";
+  font-weight: bold;
+}
+
+.log .info {
+  color: var(--shadow);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* The button: big, round, and obviously pressed while held. */
+.hold {
+  flex: none;
+  align-self: center;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--ink);
+  background: radial-gradient(circle at 35% 30%, #f0f0f0, var(--face) 60%, #a0a0a0);
+  border: 3px solid;
+  border-color: var(--face-light) var(--dark) var(--dark) var(--face-light);
+  box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.35);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.hold.recording {
+  background: radial-gradient(circle at 35% 30%, #ff9090, #d02020 60%, #901010);
+  color: var(--white);
+  border-color: var(--dark) var(--face-light) var(--face-light) var(--dark);
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.hold.busy {
+  background: radial-gradient(circle at 35% 30%, #fff5c0, #e0c040 60%, #a08010);
+}
+
+.type-row {
+  display: flex;
+  gap: 6px;
+}
+
+.type-row .btn {
+  flex: none;
+}
+
+.extras {
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+}

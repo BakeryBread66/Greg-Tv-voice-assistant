@@ -7,7 +7,8 @@
 import { createFace } from "./face.js";
 import { LocalListener } from "./listen-local.js";
 import { initSettings, paintSettings } from "./settings.js";
-import { normalize, afterWakeWord as matchWakeWord, isFiller, isCancel, isReplay } from "./wake.js";
+import { isHotkey } from "./hotkey.js";
+import { normalize, afterWakeWord as matchWakeWord, isFiller, isCancel as matchCancel, isReplay, namesFrom, keepsListening } from "./wake.js";
 import { createVocoder } from "./vocoder.js";
 import { clampVolume, stepVolume, volumeLabel } from "./volume.js";
 import { sentenceAt } from "./subtitles.js";
@@ -352,6 +353,21 @@ function connectEventStream() {
     } catch {
       return;
     }
+    // The brain was switched in Settings — in this window or another. The badge
+    // exists to say where every word is going, so it changes the moment that does.
+    if (payload.type === "brain" && payload.info) {
+      Object.assign(config, payload.info);
+      el.badge.textContent = config.hasBrain ? `${config.location?.city ?? ""}`.trim() || "online" : "basic mode";
+      el.badge.title = config.brainLabel ?? "";
+      el.badge.classList.toggle("warn", !config.hasBrain);
+      showBrainPlace(config);
+      return;
+    }
+    // Greg.exe heard the push-to-talk key, in whatever program you were in.
+    if (payload.type === "listen") {
+      talkNow();
+      return;
+    }
     if (payload.type === "reminder") {
       // A late one names the time it was actually due. "Take your medicine"
       // hours after the fact, with no indication it is late, is a prompt to take
@@ -550,6 +566,9 @@ function startHeartbeat() {
 // The matching itself lives in wake.js so it can be proven in Node — this is the
 // one line that knows where the wake words come from.
 const afterWakeWord = (transcript) => matchWakeWord(transcript, config.wakeWords);
+// His name, and what the wake words hear it as, so "shut up greg" and "shut up
+// craig" are both a dismissal. Read at call time: Settings can rename him.
+const isCancel = (said) => matchCancel(said, namesFrom(config.wakeWords, config.name));
 
 // ---------------------------------------------------------------------------
 // Listening
@@ -812,6 +831,9 @@ function handleFinal(transcript) {
     const remainder = afterWakeWord(transcript);
     if (remainder === null) return; // not for Greg
 
+    // "Hey Greg, shut up" is not a question, and asking the model it gets an
+    // answer back when the one thing asked for was silence.
+    if (remainder && isCancel(remainder)) return;
     if (remainder.split(" ").filter(Boolean).length >= 1) {
       ask(remainder);
     } else {
@@ -1010,8 +1032,10 @@ async function ask(text) {
   // Stay open for a few seconds so a follow-up doesn't need the wake word again.
   // Conversations are rarely one question long, and "Hey Greg" before every
   // sentence is the thing that makes a voice assistant feel like a vending machine.
+  // Or only when he asked something, or never — the user's choice, because the
+  // same window also lets in speech that was never meant for him. See wake.js.
   const followUp = config.followUp ?? {};
-  if (followUp.enabled !== false) arm({ seconds: followUp.seconds ?? 7, followUp: true });
+  if (keepsListening(reply, followUp)) arm({ seconds: followUp.seconds ?? 7, followUp: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -1945,9 +1969,14 @@ function adoptSettings(state) {
     };
     applyVocoder();
   }
+  if (state.pushToTalk) config.pushToTalk = { key: state.pushToTalk.key ?? "" };
   if (state.listening) {
     if (typeof state.listening.deviceId === "string") micDeviceId = state.listening.deviceId;
-    config.followUp = { enabled: state.listening.followUpEnabled, seconds: state.listening.followUpSeconds };
+    config.followUp = {
+      enabled: state.listening.followUpMode !== "off",
+      mode: state.listening.followUpMode,
+      seconds: state.listening.followUpSeconds,
+    };
     config.bargeIn = { enabled: state.listening.bargeInEnabled, sustainMs: state.listening.bargeInSustainMs };
 
     // Remembered FIRST, so a listener built later in wake() starts with the
@@ -2106,6 +2135,35 @@ el.input.addEventListener("keydown", (event) => {
   if (!text || offline || mode === "thinking" || mode === "speaking") return;
   el.input.value = "";
   ask(text);
+});
+
+/**
+ * The push-to-talk key: listen now, no wake word.
+ *
+ * What a click on his face does, with one difference: pressed while he is
+ * talking, it opens the window as well as stopping him. You pressed it because
+ * you have something to say, which is what interrupt() assumes of barge-in too.
+ */
+function talkNow() {
+  if (offline || !micEnabled) return;
+  if (mode === "speaking" || mode === "thinking") {
+    abandonAnswer();
+    setMode("idle");
+    startListening();
+  }
+  arm();
+}
+
+// The same key while his own window has focus. Started from Greg.exe, Windows
+// hands the key to Greg.exe instead and this never sees it — which is right, or
+// one press would arrive twice. Started any other way, this is all there is.
+window.addEventListener("keydown", (event) => {
+  if (!isHotkey(event, config.pushToTalk?.key)) return;
+  // Typing in a box, or choosing the key in Settings, is not asking to talk.
+  const target = event.target;
+  if (target?.closest?.("input, textarea, select, [contenteditable]")) return;
+  event.preventDefault();
+  talkNow();
 });
 
 // Click the face to interrupt, or to talk without saying the wake word.

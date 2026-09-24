@@ -103,3 +103,27 @@ test("only Greg.exe asks for any of this", () => {
     assert.equal(startedByLauncher(env), false, JSON.stringify(env));
   }
 });
+
+test("kept running for a phone, the next close still stops him once that is switched off", () => {
+  const clock = fakeClock();
+  let keepRunning = true;
+  let stops = 0;
+  const w = createWindowWatch({
+    onAllClosed: () => {
+      if (keepRunning) return false; // what server.js returns when staying up for the phone
+      stops++;
+    },
+    setTimer: clock.setTimer,
+    clearTimer: clock.clearTimer,
+  });
+  w.opened();
+  w.closed();
+  clock.run();
+  assert.equal(stops, 0, "stayed up for the phone");
+
+  keepRunning = false;
+  w.opened();
+  w.closed();
+  clock.run();
+  assert.equal(stops, 1, "the next close stopped him");
+});

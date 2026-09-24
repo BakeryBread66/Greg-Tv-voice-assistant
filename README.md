@@ -14,6 +14,7 @@ picture reacts to your voice and to his own.*
 - **Reads your local news** — headlines from your actual city
 - **Holds a conversation** — a real language model, running on your own PC
 - **Has a face** — a floating TV head whose picture reacts to your voice and his own
+- **Comes with you** — talk to him from your phone, anywhere, and get your reminders as notifications ([how](docs/phone.md))
 
 **No API key. No account. No subscription.** His brain, his ears *and* his voice all run entirely on your own machine. Nothing you say — and nothing he says — is sent anywhere. Unplug the internet and he still talks to you; he just can't look up the weather or the news.
 
@@ -214,6 +215,7 @@ pages rather than on this one, so this page stays readable:
 - **[Talking to Greg](docs/talking-to-greg.md)** — how a conversation flows, things to say, personality and personas
 - **[What else he can do](docs/features.md)** — screen vision, music, files, subtitles, volume
 - **[Giving him a different voice](docs/voices.md)** — cloning somebody from ten seconds of recording, and the Piper voices
+- **[Greg on your phone](docs/phone.md)** — talking to him from anywhere, and reminders as notifications
 - **[Configuration](docs/configuration.md)** — every setting, and which need a restart
 - **[Troubleshooting](docs/troubleshooting.md)** — when something is not working
 

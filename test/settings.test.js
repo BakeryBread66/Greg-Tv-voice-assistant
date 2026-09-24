@@ -726,3 +726,33 @@ test("a progress bar is not an error message", async () => {
     /ran out of memory/,
   );
 });
+
+test("follow-up listening has three modes, and a config from before them still means what it meant", async () => {
+  // Written before the modes existed: enabled and nothing else.
+  assert.equal(settingsState().listening.followUpMode, "always");
+  config.followUp = { enabled: false, seconds: 7 };
+  assert.equal(settingsState().listening.followUpMode, "off");
+
+  for (const mode of ["question", "off", "always"]) {
+    await applySettings({ listening: { followUpMode: mode } });
+    assert.equal(settingsState().listening.followUpMode, mode);
+    // Kept in step, so an older reader of config.json still gets it right.
+    assert.equal(config.followUp.enabled, mode !== "off");
+  }
+  const saved = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+  assert.equal(saved.followUp.mode, "always");
+});
+
+test("an unknown follow-up mode is not stored", async () => {
+  await applySettings({ listening: { followUpMode: "question" } });
+  await applySettings({ listening: { followUpMode: "sometimes" } });
+  await applySettings({ listening: { followUpMode: null } });
+  await applySettings({ listening: { followUpMode: "" } });
+  assert.equal(settingsState().listening.followUpMode, "question");
+});
+
+test("switching follow-up on the old yes-or-no way turns an 'off' mode back on", async () => {
+  await applySettings({ listening: { followUpMode: "off" } });
+  await applySettings({ listening: { followUpEnabled: true } });
+  assert.equal(settingsState().listening.followUpMode, "always");
+});

@@ -186,7 +186,8 @@ test("a slow tool: the filler is said first, marked as a preface, and kept in th
 
 test("a quick tool: no filler at all", async () => {
   const heard = [];
-  const result = await withOllama("get_current_time", () => think("what time is it", [], CONFIG, (text) => heard.push(text)));
+  // Not "what time is it", which no longer reaches a model (test/quick.test.js).
+  const result = await withOllama("get_current_time", () => think("is it lunchtime yet", [], CONFIG, (text) => heard.push(text)));
   assert.deepEqual(heard, ["Here is what I found."]);
   assert.equal(result.reply, "Here is what I found.");
 });

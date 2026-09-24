@@ -525,7 +525,8 @@ body[data-mode="offline"] .title-bar {
 }
 
 .settings-dialog {
-  width: min(340px, 94%);
+  /* 380 since the Memory tab: six tabs, and lists with buttons on each row. */
+  width: min(380px, 94%);
   max-height: 94%;
   display: flex;
   flex-direction: column;
@@ -559,13 +560,17 @@ body[data-mode="offline"] .title-bar {
 
 .tabs {
   display: flex;
-  gap: 2px;
+  /* A second row if the window is too narrow for seven, the way Windows 98
+     stacked tabs itself, rather than one hanging off the dialog. */
+  flex-wrap: wrap;
+  gap: 1px;
   padding: 4px 4px 0;
   margin-bottom: -1px;
 }
 
 .tab {
-  padding: 3px 8px 4px;
+  /* 4px, not 8: seven tabs since the Brain tab, and they should share one row. */
+  padding: 3px 4px 4px;
   background: var(--face);
   color: var(--ink);
   font-family: var(--font);
@@ -578,7 +583,7 @@ body[data-mode="offline"] .title-bar {
 
 .tab[aria-selected="true"] {
   /* Sits proud of the strip and covers the page's top border. */
-  padding: 4px 10px 5px;
+  padding: 4px 6px 5px;
   margin-top: -2px;
   background: var(--face-light);
   z-index: 1;
@@ -620,6 +625,8 @@ body[data-mode="offline"] .title-bar {
 .field.inline > span {
   display: inline;
   margin: 0;
+  /* A label beside a stretching box wraps word by word otherwise ("Talk" over "key"). */
+  white-space: nowrap;
 }
 
 .field input[type="text"],
@@ -874,4 +881,96 @@ body[data-mode="offline"] .title-bar {
 .swatches button[aria-pressed="true"] {
   outline: 2px dotted var(--ink);
   outline-offset: -6px;
+}
+
+/* ---------------------------------------------------------------------------
+   The Memory tab — a list box whose rows carry their own buttons
+   --------------------------------------------------------------------------- */
+
+.mem-list {
+  max-height: 150px;
+}
+
+.mem-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  cursor: default;
+  border-bottom: 1px solid var(--face);
+}
+
+/* A row is not a choice to make, so it does not light up like a search result. */
+.mem-list li:hover {
+  background: none;
+  color: inherit;
+}
+
+.mem-list .mem-text {
+  flex: 1 1 150px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mem-list .mem-when {
+  display: block;
+  font-size: 11px;
+  color: #404040;
+}
+
+.mem-list .btn {
+  min-width: 0;
+  min-height: 19px;
+  padding: 1px 6px;
+  font-size: 11px;
+}
+
+.mem-list .btn.confirm {
+  font-weight: bold;
+}
+
+.mem-list input[type="text"] {
+  flex: 1 1 100%;
+  padding: 2px 3px;
+  font-family: var(--font);
+  font-size: 12px;
+}
+
+.mem-list input[type="time"],
+.mem-list select {
+  font-family: var(--font);
+  font-size: 11px;
+}
+
+/* The Phone tab's pairing code: big enough to read from arm's length while
+   typing it into a phone. */
+.phone-pairing {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  background: var(--white);
+  border: 2px solid;
+  border-color: var(--shadow) var(--white) var(--white) var(--shadow);
+}
+
+.phone-code {
+  margin: 4px 0;
+  font-family: "Consolas", "Lucida Console", monospace;
+  font-size: 26px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  text-align: center;
+}
+
+/* The Brain tab: its one action button sits on its own row, right-aligned. */
+.brain-buttons {
+  padding: 0 0 8px;
+}
+
+.settings-problem.warning {
+  color: #604000;
+}
+
+.mem-list .mem-empty {
+  color: #404040;
+  font-style: italic;
 }

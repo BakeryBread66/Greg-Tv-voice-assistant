@@ -222,3 +222,8 @@ function encodeWav(samples, rate) {
 
   return new Blob([buffer], { type: "audio/wav" });
 }
+
+// Shared with the phone page (public/phone/phone.js), which records a held
+// button rather than listening for speech, but must send Whisper the same
+// 16 kHz WAV this page does.
+export { downsample, encodeWav, TARGET_RATE };

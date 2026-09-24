@@ -14,7 +14,12 @@ import { initSapi } from "./lib/tts-sapi.js";
 import { initClone, cloneStatus, stopClone } from "./lib/tts-clone.js";
 import { powerState, setVision, setGamingMode, onPowerChange } from "./lib/power.js";
 import { channelState, setChannel, turnKnob, onChannelChange, addChannels } from "./lib/channels.js";
-import { initSettings, settingsState, applySettings, onSettingsChange } from "./lib/settings.js";
+import { listFactRecords, editFact, deleteFact, remember } from "./lib/memory.js";
+import { brainState, changeBrain } from "./lib/claude-brain.js";
+import { createPhoneServer } from "./lib/phone-server.js";
+import { listPhones, removePhone, startPairing, pendingPairing, cancelPairing, vapidPublicKey, notifyPhones } from "./lib/phones.js";
+import { tailscaleState } from "./lib/tailscale.js";
+import { initSettings, settingsState, applySettings, onSettingsChange, hotkeyState, setHotkeyStatus, saveConfig } from "./lib/settings.js";
 import { getNowPlaying, getArt, stopNowPlaying } from "./lib/nowplaying.js";
 import { getProgramme, clearProgrammes, addProgramme } from "./lib/programmes.js";
 import { loadAddons, addonLoader, ADDON_FOLDER } from "./lib/addons.js";
@@ -39,7 +44,7 @@ import { geocode } from "./lib/geocode.js";
 import { setSelectedPlace, getSelectedPlace } from "./lib/selection.js";
 import { initPersonality, TRAITS } from "./lib/personality.js";
 import { initSpotify, loginUrl, completeLogin, status as spotifyStatus, duck, unduck } from "./lib/spotify.js";
-import { initReminders } from "./lib/reminders.js";
+import { initReminders, listReminders, updateReminder, deleteReminder } from "./lib/reminders.js";
 import { initStt, transcribe, sttStatus, stopStt } from "./lib/stt.js";
 import { visionStatus } from "./lib/vision.js";
 import { setWindowRect } from "./lib/screen.js";
@@ -128,6 +133,13 @@ function broadcast(payload) {
 const LAUNCHED = startedByLauncher();
 const windows = createWindowWatch({
   onAllClosed: () => {
+    // Kept running for a paired phone, by the user's choice in Settings: the
+    // phone can only reach a Greg who is running. The tray icon stays, and Stop
+    // Greg there still stops him.
+    if (config.phone?.enabled && config.phone?.keepRunning) {
+      console.log("\n[greg] his window was closed; staying up for the phone (Settings → Phone).");
+      return false; // re-arms the watch: see lib/lifetime.js
+    }
     console.log("\n[greg] his window was closed, so he is shutting down.");
     stopChildren();
     process.exit(0);
@@ -153,6 +165,159 @@ function readBody(req, limitBytes = 1_000_000) {
     });
     req.on("error", reject);
   });
+}
+
+/**
+ * Where the brain runs, as the page reads it: here at load, and pushed as a
+ * "brain" event after a switch in Settings, so the title-bar badge is never
+ * describing the brain he had before. public/brain-place.js turns these into
+ * the badge; brainOnThisMachine false means every word goes somewhere else.
+ */
+function brainInfo() {
+  const brain = describeBrain();
+  return {
+    hasBrain: brain.active,
+    brainLabel: brain.label,
+    brainKind: brain.kind ?? null,
+    brainOnThisMachine: brain.onThisMachine,
+    brainService: brain.service,
+  };
+}
+
+/**
+ * Answer one question as a stream of sentences, one SSE frame each.
+ *
+ * Shared by his own page and a paired phone, so the two can never answer
+ * differently. `remote` is the phone: no screen, no files (see PHONE_BLOCKED in
+ * lib/brain.js). Each phone keeps its own conversation, so a question asked on
+ * the bus does not become context for one asked at the desk.
+ */
+async function streamAnswer(res, { text, awaySeconds = 0, turnHistory = history, remote = false, via = null }) {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+  });
+
+  console.log(`\n[${via ? "phone" : "you"}]  ${text}`);
+  const started = Date.now();
+  let firstAt = null;
+  // The first sentence of the ANSWER, as opposed to anything said first. With
+  // "Let me look that up." spoken in 0.3 s, firstAt alone would make a
+  // ten-second search look instant in the log.
+  let answerAt = null;
+  let index = 0;
+
+  const send = (payload) => {
+    try {
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    } catch {
+      // The page went away mid-answer; the loop below finishes harmlessly.
+    }
+  };
+
+  const { reply, usedTools, historyCleared, timing } = await think(
+    String(text).trim(),
+    turnHistory,
+    config,
+    (sentence, meta = {}) => {
+      if (firstAt === null) firstAt = Date.now() - started;
+      if (answerAt === null && !meta.preface) answerAt = Date.now() - started;
+      // `preface` marks what he says before the answer - "Let me look that
+      // up.", a welcome back - so the page speaks it at once without
+      // mistaking it for the answer's first sentence. See ask() in voice.js.
+      send({ type: "sentence", text: sentence, index: index++, ...(meta.preface ? { preface: true } : {}) });
+    },
+    awaySeconds,
+    { remote }
+  );
+
+  console.log(`[greg] ${reply}`);
+  const detail = [
+    usedTools.length ? `used: ${usedTools.join(", ")}` : null,
+    firstAt !== null ? `first sentence ${firstAt}ms` : null,
+    answerAt !== null && answerAt !== firstAt ? `answer ${answerAt}ms` : null,
+    `total ${Date.now() - started}ms`,
+    timing?.length ? describeTiming(timing) : null,
+  ].filter(Boolean);
+  console.log(`       (${detail.join(", ")})`);
+
+  // After the reply is out, never before: this touches the disk and the
+  // streaming path measures its own time to first sentence. Skipped for the
+  // turn that cleared the log, for the reason given in /api/chat above.
+  if (historyCleared) {
+    console.log("[log] conversation history cleared (asked for by voice)");
+    // Everywhere, not just this conversation: the log is one log, and a
+    // phone asking for it gone must not leave it in the PC's context.
+    history.length = 0;
+    for (const kept of phoneHistories.values()) kept.length = 0;
+  } else {
+    logTurn({ user: text, reply, usedTools, ms: Date.now() - started, firstMs: firstAt, answerMs: answerAt, timing, via });
+  }
+
+  send({ type: "done", reply, usedTools });
+  return res.end();
+}
+
+// Each paired phone's conversation, in memory like the page's own.
+const phoneHistories = new Map();
+
+const phonePort = () => Number(config.phone?.port) || 4757;
+let phoneServer = null;
+
+/**
+ * Start the phone's own server, if phone access is switched on. It listens on
+ * 127.0.0.1 only; `tailscale serve` is what carries a phone's requests to it.
+ * See lib/phone-server.js for why it is a separate server at all.
+ */
+function startPhoneServer() {
+  if (phoneServer || !config.phone?.enabled) return;
+  phoneServer = createPhoneServer({
+    publicDir: PUBLIC_DIR,
+    handlers: {
+      hello: async (phone) => ({
+        name: config.name ?? "Greg",
+        phone: phone.name,
+        pushKey: vapidPublicKey(),
+        notifications: phone.notifications,
+      }),
+      transcribe: (audio) => transcribe(audio),
+      answer: (req, res, { text, phone }) => {
+        if (!phoneHistories.has(phone.id)) phoneHistories.set(phone.id, []);
+        return streamAnswer(res, { text, turnHistory: phoneHistories.get(phone.id), remote: true, via: phone.name });
+      },
+      speak: (text) => synthesize(text, { voice: config.voice, rate: config.rate, pitch: config.pitch }),
+    },
+  });
+  phoneServer.on("error", (err) => {
+    console.warn(`[phone] couldn't listen on port ${phonePort()}: ${err.message}`);
+    phoneServer = null;
+  });
+  phoneServer.listen(phonePort(), "127.0.0.1", () => {
+    console.log(`[phone] listening on 127.0.0.1:${phonePort()} for paired phones (via tailscale serve)`);
+  });
+}
+
+function stopPhoneServer() {
+  if (!phoneServer) return;
+  phoneServer.close();
+  phoneServer.closeAllConnections?.();
+  phoneServer = null;
+  console.log("[phone] phone access switched off");
+}
+
+/** What the Phone tab shows. Never a token. */
+async function phoneState() {
+  return {
+    enabled: Boolean(config.phone?.enabled),
+    keepRunning: Boolean(config.phone?.keepRunning),
+    listening: Boolean(phoneServer?.listening),
+    port: phonePort(),
+    launcher: LAUNCHED,
+    phones: listPhones(),
+    pairing: pendingPairing(),
+    tailscale: await tailscaleState(phonePort()),
+  };
 }
 
 function serveStatic(req, res, urlPath) {
@@ -308,7 +473,6 @@ const server = http.createServer(async (req, res) => {
     // --- Startup info for the browser ---
     if (url.pathname === "/api/config" && req.method === "GET") {
       const loc = await getLocation(config);
-      const brain = describeBrain();
       const ears = sttStatus();
       const mouth = piperStatus();
       return sendJson(res, 200, {
@@ -316,14 +480,7 @@ const server = http.createServer(async (req, res) => {
         wakeWords: config.wakeWords ?? ["hey greg"],
         followUp: config.followUp ?? { enabled: true, seconds: 7 },
         bargeIn: config.bargeIn ?? { enabled: true, sustainMs: 350 },
-        hasBrain: brain.active,
-        brainLabel: brain.label,
-        // Where the brain runs, so the window can say so the whole time rather
-        // than only in the boot screen. public/brain-place.js turns these into
-        // the title-bar badge; false means every word goes somewhere else.
-        brainKind: brain.kind ?? null,
-        brainOnThisMachine: brain.onThisMachine,
-        brainService: brain.service,
+        ...brainInfo(),
         // Coordinates as well as the name, so the globe can drop a home marker.
         location: { city: loc.city, region: loc.region, latitude: loc.latitude, longitude: loc.longitude },
         // "local" = offline Whisper on this machine, "browser" = Chrome's cloud service
@@ -369,63 +526,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/chat/stream" && req.method === "POST") {
       const { text, awaySeconds } = await readBody(req);
       if (!text || !String(text).trim()) return sendJson(res, 400, { error: "no text supplied" });
-
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-      });
-
-      console.log(`\n[you]  ${text}`);
-      const started = Date.now();
-      let firstAt = null;
-      // The first sentence of the ANSWER, as opposed to anything said first. With
-      // "Let me look that up." spoken in 0.3 s, firstAt alone would make a
-      // ten-second search look instant in the log.
-      let answerAt = null;
-      let index = 0;
-
-      const send = (payload) => {
-        try {
-          res.write(`data: ${JSON.stringify(payload)}\n\n`);
-        } catch {
-          // The page went away mid-answer; the loop below finishes harmlessly.
-        }
-      };
-
-      const { reply, usedTools, historyCleared, timing } = await think(
-        String(text).trim(),
-        history,
-        config,
-        (sentence, meta = {}) => {
-          if (firstAt === null) firstAt = Date.now() - started;
-          if (answerAt === null && !meta.preface) answerAt = Date.now() - started;
-          // `preface` marks what he says before the answer - "Let me look that
-          // up.", a welcome back - so the page speaks it at once without
-          // mistaking it for the answer's first sentence. See ask() in voice.js.
-          send({ type: "sentence", text: sentence, index: index++, ...(meta.preface ? { preface: true } : {}) });
-        },
-        awaySeconds
-      );
-
-      console.log(`[greg] ${reply}`);
-      const detail = [
-        usedTools.length ? `used: ${usedTools.join(", ")}` : null,
-        firstAt !== null ? `first sentence ${firstAt}ms` : null,
-        answerAt !== null && answerAt !== firstAt ? `answer ${answerAt}ms` : null,
-        `total ${Date.now() - started}ms`,
-        timing?.length ? describeTiming(timing) : null,
-      ].filter(Boolean);
-      console.log(`       (${detail.join(", ")})`);
-
-      // After the reply is out, never before: this touches the disk and the
-      // streaming path measures its own time to first sentence. Skipped for the
-      // turn that cleared the log, for the reason given in /api/chat above.
-      if (historyCleared) console.log("[log] conversation history cleared (asked for by voice)");
-      else logTurn({ user: text, reply, usedTools, ms: Date.now() - started, firstMs: firstAt, answerMs: answerAt, timing });
-
-      send({ type: "done", reply, usedTools });
-      return res.end();
+      return streamAnswer(res, { text, awaySeconds });
     }
 
     // --- Turn speech into text, locally ---
@@ -533,6 +634,131 @@ const server = http.createServer(async (req, res) => {
       // dialog needs the real state back either way so it can't drift from what
       // was actually accepted.
       return sendJson(res, 200, result);
+    }
+
+    // --- The Phone tab in Settings ---
+    //
+    // Pairing codes are made here, at the PC, and only here: the phone server
+    // can use a code but never start one, so pairing needs somebody at this PC.
+    if (url.pathname === "/api/phone" && req.method === "GET") {
+      return sendJson(res, 200, await phoneState());
+    }
+
+    if (url.pathname === "/api/phone" && req.method === "POST") {
+      const body = await readBody(req);
+      config.phone ??= {};
+      let result = { ok: true };
+      if (body.action === "enable") {
+        config.phone.enabled = body.on === true;
+        saveConfig();
+        if (config.phone.enabled) startPhoneServer();
+        else stopPhoneServer();
+      } else if (body.action === "keep-running") {
+        config.phone.keepRunning = body.on === true;
+        saveConfig();
+      } else if (body.action === "pair") {
+        if (!config.phone.enabled) result = { error: "Turn phone access on first." };
+        else result = { ok: true, pairing: startPairing() };
+      } else if (body.action === "cancel-pair") {
+        cancelPairing();
+      } else if (body.action === "remove") {
+        result = removePhone(String(body.id ?? ""));
+        if (result.ok) phoneHistories.delete(String(body.id));
+      } else {
+        result = { error: "say what to do: enable, keep-running, pair, cancel-pair or remove" };
+      }
+      if (result.ok) console.log(`[phone] ${body.action} from Settings`);
+      return sendJson(res, result.error ? 400 : 200, { ...result, state: await phoneState() });
+    }
+
+    // --- Which brain: the Settings dialog's Brain tab ---
+    //
+    // Acts when asked, like the Memory tab: a switch to Claude checks the key
+    // with Anthropic first and changes nothing if it fails. The key itself is
+    // never sent back, never logged, and lives in .env. See lib/claude-brain.js.
+    if (url.pathname === "/api/brain" && req.method === "GET") {
+      return sendJson(res, 200, brainState(config));
+    }
+
+    if (url.pathname === "/api/brain" && req.method === "POST") {
+      const body = await readBody(req);
+      const before = describeBrain().label;
+      const result = await changeBrain(body, config);
+      // The action, never the body: it may hold the key.
+      if (result.ok) console.log(`[brain] ${body.action} from Settings`);
+      const after = describeBrain().label;
+      if (after !== before) {
+        console.log(`[brain] now ${after}`);
+        broadcast({ type: "brain", info: brainInfo() });
+      }
+      return sendJson(res, result.error ? 400 : 200, result);
+    }
+
+    // --- What he knows about you: the Settings dialog's own tab ---
+    //
+    // Everything he remembers and everything he has scheduled, where the user
+    // can see it, correct it and delete it. A click names one item exactly —
+    // by its text or id — so nothing here goes through forget()'s word match.
+    // Every answer carries the fresh lists, so the dialog repaints from what is
+    // really stored rather than from what it assumed happened.
+    if (url.pathname === "/api/memory" && req.method === "GET") {
+      return sendJson(res, 200, { facts: listFactRecords(), reminders: listReminders() });
+    }
+
+    if (url.pathname === "/api/memory" && req.method === "POST") {
+      const body = await readBody(req);
+      let result;
+      switch (body.action) {
+        case "remember":
+          try {
+            result = { ok: true, text: remember(body.text) };
+          } catch (err) {
+            result = { error: err.message };
+          }
+          break;
+        case "edit-fact":
+          result = editFact(body.was, body.text);
+          break;
+        case "forget-fact":
+          result = deleteFact(body.text);
+          break;
+        case "edit-reminder":
+          result = updateReminder(body.id, { text: body.text, time: body.time, repeat: body.repeat });
+          break;
+        case "cancel-reminder":
+          result = deleteReminder(body.id);
+          break;
+        default:
+          result = { error: "say what to do: remember, edit-fact, forget-fact, edit-reminder or cancel-reminder" };
+      }
+      // Not what was changed: the console carries the conversation already, and
+      // a fact someone deleted should not reappear in it.
+      if (result.ok) console.log(`[memory] ${body.action} from Settings`);
+      return sendJson(res, result.error ? 400 : 200, { ...result, facts: listFactRecords(), reminders: listReminders() });
+    }
+
+    // --- The push-to-talk key ---
+    //
+    // Greg.exe claims the key from Windows so it works in every program, which
+    // the page cannot do. It polls GET for the key (a change in Settings applies
+    // without a restart), reports with POST whether Windows gave it the key, and
+    // POSTs /api/listen when it is pressed. The page then does what a click on
+    // his face does. See public/hotkey.js and launcher/Greg.cs.
+    if (url.pathname === "/api/hotkey" && req.method === "GET") {
+      return sendJson(res, 200, hotkeyState());
+    }
+
+    if (url.pathname === "/api/hotkey" && req.method === "POST") {
+      const status = setHotkeyStatus(await readBody(req));
+      if (status.key) {
+        console.log(status.claimed ? `[hotkey] ${status.key} works in every program` : `[hotkey] ${status.key} could not be claimed: ${status.problem}`);
+      }
+      return sendJson(res, 200, status);
+    }
+
+    if (url.pathname === "/api/listen" && req.method === "POST") {
+      broadcast({ type: "listen" });
+      return sendJson(res, 200, { ok: true });
     }
 
     // --- What is on Greg's screen ---
@@ -1079,7 +1305,15 @@ server.listen(PORT, "127.0.0.1", async () => {
   const restored = initReminders((item) => {
     console.log(`[reminder] ${item.text}${item.late ? " (was due while Greg was off)" : ""}`);
     broadcast({ type: "reminder", text: item.text, kind: item.kind, late: Boolean(item.late) });
+    // And to every phone that asked for notifications. Fired and forgotten: a
+    // push service being slow must not hold up the reminder spoken here.
+    const when = item.late ? ` (was due at ${item.dueAtLocal})` : "";
+    notifyPhones({ title: config.name ?? "Greg", body: `${item.text}${when}`, tag: item.id })
+      .then((sent) => sent && console.log(`[phone] reminder sent to ${sent} phone${sent === 1 ? "" : "s"}`))
+      .catch((err) => console.warn("[phone] reminder notification failed:", err.message));
   });
+
+  startPhoneServer();
   if (restored.restored || restored.missed) {
     console.log(`[reminder] ${restored.restored} still pending, ${restored.missed} came due while away`);
   }

@@ -76,16 +76,37 @@ a deny list that wins over the allow list, and paths are resolved with `realpath
 `files.roots` to `[]` to switch the whole thing off.
 
 **Your data stays out of the repository.** `config.json`, `conversations.jsonl`,
-`memory.json`, `reminders.json`, `spotify-tokens.json`, `.env`, `voices/` and
-`screenshots/` are all gitignored. If you fork this and push, check `git status`
+`memory.json`, `reminders.json`, `spotify-tokens.json`, `phones.json`, `.env`,
+`voices/` and `screenshots/` are all gitignored. If you fork this and push, check `git status`
 before your first commit anyway.
 
 **The brain leaves the machine only if you name it.** `"provider": "auto"`, the
 default, runs the local model and nothing else — a key in `.env` is not enough
-to switch to Claude. With `"provider": "anthropic"` everything said to him goes
-to Anthropic, and the window shows an amber **CLAUDE · CLOUD** badge in the
-title bar for as long as that is true. The same badge appears for an Ollama
-brain that is not on this PC.
+to switch to Claude. With `"provider": "anthropic"` — set by hand, or by
+**Use Claude** in Settings → Brain — everything said to him goes to Anthropic,
+and the window shows an amber **CLAUDE · CLOUD** badge in the title bar for as
+long as that is true. The same badge appears for an Ollama brain that is not on
+this PC.
+
+**The API key is kept in `.env`, never in `config.json`,** and the Settings
+dialog never shows it back — only whether one is saved and its last four
+characters. A key is checked with Anthropic before it is saved. Anything with a
+line break, space or quote in it is refused, so a pasted value cannot write a
+second setting into `.env`.
+
+**A phone reaches Greg only if you set it up, and never his screen or files.**
+Phone access is off until switched on in Settings. A phone comes in through
+Tailscale to a separate server on 127.0.0.1:4757 — never to Greg's own port —
+which offers only pairing, talking, hearing, speaking and notifications; there is
+no route there to settings, memory, files, the screen or the log. Pairing codes
+are made only at the PC, last ten minutes, work once and die after five wrong
+guesses. Each phone holds a random token of which only a hash is stored in
+`phones.json` (gitignored); removing it in Settings revokes it at once. From a
+phone the brain is never offered the screen or file tools, is told it has none,
+and is refused them in code if it asks. Reminder notifications are encrypted on
+the PC (RFC 8291) and signed with a key that never leaves it; the push services
+that carry them can't read them, and a notification can only be sent to Apple's,
+Google's, Mozilla's or Microsoft's push services.
 
 **Deleting is gated on your words.** Clearing the conversation log by voice only
 works when what you said that turn asked for it; nothing he reads — a web page,

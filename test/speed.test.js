@@ -245,7 +245,9 @@ test("think() reports each model round and each tool call", async () => {
   };
   try {
     await initBrain(CONFIG);
-    const { timing } = await think("what time is it", [], CONFIG);
+    // Not "what time is it": that one is answered without a model now (see
+    // test/quick.test.js), and this test is about the model's rounds.
+    const { timing } = await think("is it lunchtime yet", [], CONFIG);
     assert.deepEqual(timing.map(([name]) => name), ["model", "get_current_time", "model"]);
     assert.ok(timing.every(([, ms]) => Number.isFinite(ms) && ms >= 0));
   } finally {

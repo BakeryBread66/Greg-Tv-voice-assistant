@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Greg</title>
+    <meta name="theme-color" content="#000080" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Greg" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="icon" href="icon-192.png" />
+    <link rel="stylesheet" href="phone.css" />
+  </head>
+  <body>
+    <div class="window">
+      <div class="title-bar">
+        <span class="title-icon" aria-hidden="true"></span>
+        <span class="title-text">Greg</span>
+        <span id="state" class="state" role="status">connecting…</span>
+      </div>
+
+      <!-- Pairing: shown until this phone has a token. -->
+      <section id="pair" class="panel" hidden>
+        <h1>Pair this phone</h1>
+        <p>
+          On your PC, open Greg's <b>Settings</b>, go to the <b>Phone</b> tab and press
+          <b>Pair a phone</b>. Type the six-digit code here.
+        </p>
+        <p id="install-first" class="note" hidden>
+          On an iPhone, add Greg to your Home Screen first (Share, then Add to Home Screen) and
+          pair from there. Notifications only work in the Home Screen app, and it keeps its own
+          pairing.
+        </p>
+        <label class="field">
+          <span>Code</span>
+          <input id="pair-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" />
+        </label>
+        <label class="field">
+          <span>This phone's name</span>
+          <input id="pair-name" maxlength="40" placeholder="My phone" />
+        </label>
+        <button id="pair-go" class="btn btn-default" type="button">Pair</button>
+        <p id="pair-problem" class="problem" hidden></p>
+      </section>
+
+      <!-- Talking: once paired. -->
+      <section id="talk" class="panel talk" hidden>
+        <ol id="log" class="log" aria-live="polite"></ol>
+
+        <button id="hold" class="hold" type="button" aria-label="Hold to talk to Greg">
+          <span class="hold-label">Hold to talk</span>
+        </button>
+
+        <form id="type-form" class="type-row">
+          <input id="type" type="text" placeholder="…or type to Greg" autocomplete="off" enterkeyhint="send" />
+          <button class="btn" type="submit">Send</button>
+        </form>
+
+        <div class="extras">
+          <button id="notify" class="btn" type="button">Remind me here</button>
+          <button id="unpair" class="btn" type="button">Unpair</button>
+        </div>
+        <p id="talk-note" class="note"></p>
+      </section>
+    </div>
+
+    <script type="module" src="phone.js"></script>
+  </body>
+</html>

@@ -11,7 +11,7 @@ Every setting, where it lives, and which ones need a restart.
 Greg's conversation runs on **Ollama**, which hosts a language model locally on your GPU. It's already installed and configured. Greg picks a brain automatically at startup:
 
 1. **Local model via Ollama** — the default. No key, no account, works offline.
-2. **Claude** — only if you set `"provider": "anthropic"` in `config.json` **and** put an `ANTHROPIC_API_KEY` in a `.env` file. Optional; you don't need one. The default, `"auto"`, never picks it.
+2. **Claude** — only if you choose it: **Settings → Brain**, or `"provider": "anthropic"` in `config.json` with an `ANTHROPIC_API_KEY` in `.env`. Optional; you don't need one. The default, `"auto"`, never picks it.
 3. **Basic mode** — if Ollama isn't running, he still does weather, news, and time by phrase matching.
 
 If Ollama ever isn't running, start it from the Start Menu (or run `ollama serve`) and restart Greg.
@@ -78,14 +78,18 @@ That middle step matters more than it looks: without it, a hiccup in the local v
 
 ## Settings
 
-Click **⚙**, or open `http://localhost:4747/?settings`. Four tabs:
+Click **⚙**, or open `http://localhost:4747/?settings`. Eight tabs:
 
 | | |
 | --- | --- |
 | **General** | What he's called, the wake words that reach him, and °F/°C and mph/km/h |
 | **Location** | Follow your IP, or pin a place — search for a town and pick it |
 | **Personality** | The six dials, "match my tone", and a free-text instruction |
-| **Listening** | The follow-up window, barge-in sensitivity, and the microphone trigger with a live level bar |
+| **Listening** | When he keeps listening after an answer, the talk key, barge-in sensitivity, and the microphone trigger with a live level bar |
+| **Music** | Whether Spotify is set up, and what to do next if it isn't |
+| **Memory** | Everything he remembers about you and everything he has scheduled — edit or delete any of it, or add a fact yourself. Changes here happen at once |
+| **Brain** | Think on this PC, or with Claude: your API key (checked, then kept in `.env`), the Claude model, and exactly what is sent while Claude is in use. Acts on its own buttons, at once |
+| **Phone** | Let a phone reach him through Tailscale, pair and remove phones, and keep him running with his window closed. See [Greg on your phone](phone.md) |
 
 Everything here takes effect on the next thing you say — nothing needs a restart.
 That's the rule for what's in the dialog: settings that only apply after a
@@ -122,8 +126,18 @@ slider moves, because both go through the same place.
   "wakeWords": ["hey greg", ...] // add mishearings you notice here
 
   "followUp": {                  // see "How the conversation flows"
-    "enabled": true,
+    "mode": "always",            // "always", "question" (only when he asked you
+                                 // something) or "off" (always need his name)
     "seconds": 7                 // how long he stays open after answering
+  },
+  "phone": {                     // see docs/phone.md
+    "enabled": false,            // the phone's own server, on 127.0.0.1 only
+    "keepRunning": false,        // stay up when his window closes (Greg.exe)
+    "port": 4757                 // what `tailscale serve --bg 4757` forwards to
+  },
+  "pushToTalk": {
+    "key": ""                    // e.g. "Ctrl+Alt+G" or "F9": press it and he listens.
+                                 // Started from Greg.exe it works in every program
   },
   "bargeIn": {
     "enabled": true,             // false if you use speakers and he cuts himself off
@@ -224,10 +238,14 @@ Greg guesses your location from your IP, which a VPN will throw off. To pin it, 
 
 ## Optional: using Claude instead
 
-Greg doesn't need this — the local model handles everything. If you want Claude anyway, it takes two steps, on purpose:
+Greg doesn't need this — the local model handles everything. If you want Claude anyway, open **Settings → Brain**:
 
-1. Copy `.env.example` to `.env` and paste an Anthropic API key in.
-2. Set `"provider": "anthropic"` in `config.json`, and restart.
+1. Paste an API key from [console.anthropic.com](https://console.anthropic.com) and press **Save key**. It is checked with Anthropic before it is saved, and kept in `.env`; the dialog never shows it again, only its last four characters. A Claude.ai subscription can't be used here: the API is billed separately, per question.
+2. Choose **Claude**, pick a model — Opus 5, Sonnet 5 or Haiku 4.5 — and press **Use Claude**. The key is checked again, and the next thing you say goes to Claude. No restart.
+
+**Use this PC** switches back the same way, and **Remove key** takes the key out of `.env` (moving him back to this PC first if Claude was in use).
+
+Or by hand, which is what the tab does for you: put `ANTHROPIC_API_KEY=...` in `.env`, set `"provider": "anthropic"` and `"model"` in `config.json`, and restart.
 
 A key on its own does nothing. `"auto"` used to prefer Claude whenever a key was present, which made a key in `.env` a switch that silently sent every conversation to Anthropic — and because the brain is chosen once at startup, an Ollama that was slow to start could do the same for a whole session. Now leaving the PC is something you ask for by name, and the console says so if a key is set but unused.
 

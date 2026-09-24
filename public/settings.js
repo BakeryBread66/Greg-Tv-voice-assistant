@@ -12,6 +12,7 @@
 // The Music tab's wording, kept DOM-free so it can be tested — the same reason
 // wake.js and mic-help.js exist.
 import { spotifyGuidance } from "./spotify-help.js";
+import { hotkeyFromEvent, hotkeyProblem, normaliseHotkey } from "./hotkey.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -71,6 +72,51 @@ export function initSettings({ onApply, micReader, listMicrophones, switchMicrop
     // Persist it so the choice survives a restart, and so an unplugged device
     // can be recognised and fallen back from next time.
     if (!result.error) apply();
+  });
+
+  // The talk key is chosen by pressing it, not by typing its name.
+  $("set-talkkey")?.addEventListener("keydown", (event) => {
+    if (event.key === "Tab") return; // still a way out of the box
+    event.preventDefault();
+    event.stopPropagation(); // Escape here must not close the dialog
+    if (event.key === "Escape") return event.target.blur();
+    if (event.key === "Backspace" || event.key === "Delete") {
+      event.target.value = "";
+    } else {
+      const combo = hotkeyFromEvent(event);
+      if (!combo) return; // only Ctrl or Alt so far: still reaching for the key
+      event.target.value = normaliseHotkey(combo) || combo;
+    }
+    paintTalkKeyNote();
+  });
+  $("set-talkkey-clear")?.addEventListener("click", () => {
+    $("set-talkkey").value = "";
+    paintTalkKeyNote();
+  });
+
+  $("phone-enabled")?.addEventListener("change", (event) => phoneAction({ action: "enable", on: event.target.checked }));
+  $("phone-keep")?.addEventListener("change", (event) => phoneAction({ action: "keep-running", on: event.target.checked }));
+  $("phone-pair")?.addEventListener("click", () => phoneAction({ action: "pair" }));
+  $("phone-pair-cancel")?.addEventListener("click", () => phoneAction({ action: "cancel-pair" }));
+
+  $("brain-use")?.addEventListener("click", useChosenBrain);
+  $("brain-key-save")?.addEventListener("click", saveBrainKey);
+  $("brain-key-remove")?.addEventListener("click", removeBrainKey);
+  $("brain-model")?.addEventListener("change", paintBrainButton);
+  for (const radio of document.querySelectorAll('input[name="brain"]')) radio.addEventListener("change", paintBrainButton);
+  $("brain-key")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      saveBrainKey();
+    }
+  });
+
+  $("mem-add")?.addEventListener("click", addFact);
+  $("mem-new")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addFact();
+    }
   });
 
   $("settings-btn")?.addEventListener("click", open);
@@ -181,13 +227,42 @@ export function paintSettings(state) {
   $("set-vocoder-out").value = amount + "%";
 
   const l = state.listening ?? {};
-  $("set-followup").checked = l.followUpEnabled !== false;
+  $("set-followup").value = l.followUpMode ?? (l.followUpEnabled === false ? "off" : "always");
   $("set-followup-secs").value = l.followUpSeconds ?? 7;
   $("set-barge").checked = l.bargeInEnabled !== false;
   $("set-barge-ms").value = l.bargeInSustainMs ?? 600;
   $("set-minlevel").value = l.minLevel ?? 0.012;
   $("set-floor").value = l.floorMultiple ?? 3.5;
   paintMicrophones(l.deviceId ?? "");
+
+  $("set-talkkey").value = state.pushToTalk?.key ?? "";
+  paintTalkKeyNote();
+}
+
+/**
+ * What the talk key will do — and where, which depends on whether Greg.exe
+ * managed to claim it from Windows. Never says "everywhere" unless it did.
+ */
+function paintTalkKeyNote() {
+  const note = $("set-talkkey-note");
+  if (!note) return;
+  const typed = $("set-talkkey").value;
+  const problem = hotkeyProblem(typed);
+  if (problem) {
+    note.textContent = problem;
+    return;
+  }
+  const key = normaliseHotkey(typed);
+  if (!key) {
+    note.textContent = "Click the box and press a key. One press and he listens, with no wake word. F9, Pause, or a letter with Ctrl or Alt all work.";
+    return;
+  }
+  const saved = current?.pushToTalk ?? {};
+  const report = saved.key === key ? saved.global : null;
+  if (key !== saved.key) note.textContent = `Press Apply to use ${key}.`;
+  else if (report?.claimed) note.textContent = `${key} works in every program — Greg.exe has it.`;
+  else if (report) note.textContent = `${key} only works while his window is in front: ${report.problem || "Windows would not give it to Greg.exe."}`;
+  else note.textContent = `${key} works while his window is in front. Start him from Greg.exe and it works in every program.`;
 }
 
 async function paintMicrophones(chosen) {
@@ -465,6 +540,511 @@ function showTab(name) {
   for (const page of document.querySelectorAll(".tab-page")) {
     page.hidden = page.dataset.page !== name;
   }
+  // Read fresh every time it is shown: a reminder may have gone off, or he may
+  // have learned something, since the dialog opened.
+  if (name === "memory") loadMemory();
+  if (name === "brain") loadBrain();
+  if (name === "phone") loadPhone();
+  else clearInterval(phoneTick);
+}
+
+// ---------------------------------------------------------------------------
+// The Memory tab
+//
+// Each change is sent the moment it is made, and the lists are repainted from
+// what the server says is stored afterwards — never from what this page assumed
+// its change did. Everything the user or the model wrote goes in as
+// textContent: these strings came from speech and from a model, and neither is
+// allowed to be markup.
+// ---------------------------------------------------------------------------
+
+async function loadMemory() {
+  memoryProblem(null);
+  try {
+    paintMemory(await (await fetch("/api/memory", { cache: "no-store" })).json());
+  } catch {
+    memoryProblem("Couldn't reach Greg to read what he knows.");
+  }
+}
+
+async function memoryAction(body) {
+  memoryProblem(null);
+  try {
+    const res = await fetch("/api/memory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const result = await res.json();
+    if (result.facts) paintMemory(result);
+    if (result.error) memoryProblem(result.error);
+    return !result.error;
+  } catch {
+    memoryProblem("Couldn't reach Greg to change that.");
+    return false;
+  }
+}
+
+function memoryProblem(text) {
+  const box = $("mem-problem");
+  if (!box) return;
+  box.textContent = text ?? "";
+  box.hidden = !text;
+}
+
+async function addFact() {
+  const input = $("mem-new");
+  const text = input.value.trim();
+  if (!text) return;
+  if (await memoryAction({ action: "remember", text })) input.value = "";
+}
+
+function make(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function button(label, onClick) {
+  const b = make("button", "btn", label);
+  b.type = "button";
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+/**
+ * Delete takes two clicks: the first turns the button into "Sure?", and it only
+ * acts if pressed again within a few seconds. There is no undo for a fact.
+ */
+function deleteButton(onConfirm, label = "Delete") {
+  const b = button(label, () => {
+    if (b.classList.contains("confirm")) return onConfirm();
+    b.classList.add("confirm");
+    b.textContent = "Sure?";
+    setTimeout(() => {
+      b.classList.remove("confirm");
+      b.textContent = label;
+    }, 4000);
+  });
+  return b;
+}
+
+function paintMemory({ facts = [], reminders = [] } = {}) {
+  const factList = $("mem-facts");
+  factList.replaceChildren();
+  if (!facts.length) factList.append(make("li", "mem-empty", "Nothing yet. Tell him something about yourself, or add it below."));
+  for (const fact of facts) factList.append(factRow(fact));
+
+  const reminderList = $("mem-reminders");
+  reminderList.replaceChildren();
+  if (!reminders.length) reminderList.append(make("li", "mem-empty", "Nothing set."));
+  for (const item of reminders) reminderList.append(reminderRow(item));
+}
+
+/** A text box that saves on Enter and gives up on Escape without closing the dialog. */
+function editBox(value, maxLength, save) {
+  const input = make("input");
+  input.type = "text";
+  input.maxLength = maxLength;
+  input.value = value;
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") save();
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      loadMemory();
+    }
+  });
+  return input;
+}
+
+function factRow(fact) {
+  const row = make("li");
+  const text = make("span", "mem-text", fact.text);
+  if (fact.savedAt) text.append(make("span", "mem-when", `Saved ${dayAndTime(Date.parse(fact.savedAt))}`));
+  row.append(
+    text,
+    button("Edit", () => {
+      const save = () => memoryAction({ action: "edit-fact", was: fact.text, text: input.value });
+      const input = editBox(fact.text, 300, save);
+      row.replaceChildren(input, button("Save", save), button("Cancel", loadMemory));
+      input.focus();
+    }),
+    deleteButton(() => memoryAction({ action: "forget-fact", text: fact.text }))
+  );
+  return row;
+}
+
+/** "Every weekday at 4:30 PM", "tomorrow at 3:00 PM", "Timer, goes off in 8 minutes". */
+function whenOf(item) {
+  if (item.kind === "timer") return `Timer, goes off in ${item.dueIn}`;
+  if (item.every) return `${item.every[0].toUpperCase()}${item.every.slice(1)} at ${item.dueAtLocal}`;
+  return dayAndTime(item.dueAt);
+}
+
+function dayAndTime(ms) {
+  if (!Number.isFinite(ms)) return "";
+  const when = new Date(ms);
+  const today = new Date();
+  const days = Math.round((new Date(ms).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
+  const clock = when.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  let day;
+  if (days === 0) day = "today";
+  else if (days === 1) day = "tomorrow";
+  else if (days === -1) day = "yesterday";
+  else if (Math.abs(days) < 7) day = when.toLocaleDateString("en-US", { weekday: "long" });
+  else {
+    day = when.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      ...(when.getFullYear() === today.getFullYear() ? {} : { year: "numeric" }),
+    });
+  }
+  return `${day} at ${clock}`;
+}
+
+function hhmm(ms) {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function reminderRow(item) {
+  const row = make("li");
+  const text = make("span", "mem-text", item.text);
+  text.append(make("span", "mem-when", whenOf(item)));
+  row.append(
+    text,
+    button("Edit", () => {
+      let time = null;
+      let repeat = null;
+      const save = () =>
+        memoryAction({
+          action: "edit-reminder",
+          id: item.id,
+          text: input.value,
+          ...(time ? { time: time.value, repeat: repeat.value } : {}),
+        });
+      const input = editBox(item.text, 200, save);
+      const parts = [input];
+      // A timer counts down from when it was set; only its name can change.
+      if (item.kind !== "timer") {
+        time = make("input");
+        time.type = "time";
+        time.value = hhmm(item.dueAt);
+        repeat = make("select");
+        for (const [value, label] of [["none", "Once"], ["daily", "Every day"], ["weekdays", "Weekdays"]]) {
+          const option = make("option", "", label);
+          option.value = value;
+          repeat.append(option);
+        }
+        repeat.value = item.repeat ?? "none";
+        parts.push(time, repeat);
+      }
+      row.replaceChildren(...parts, button("Save", save), button("Cancel", loadMemory));
+      input.focus();
+    }),
+    deleteButton(() => memoryAction({ action: "cancel-reminder", id: item.id }))
+  );
+  return row;
+}
+
+// ---------------------------------------------------------------------------
+// The Brain tab
+//
+// Acts on its own buttons, like Memory. The page never holds the key after
+// sending it: the box is emptied as soon as the server answers, whether or not
+// the key was accepted, and the server only ever reports whether one is saved.
+// ---------------------------------------------------------------------------
+
+let brainNow = null; // the last state the server gave
+
+async function loadBrain() {
+  brainProblem(null);
+  try {
+    paintBrain(await (await fetch("/api/brain", { cache: "no-store" })).json());
+  } catch {
+    brainProblem("Couldn't reach Greg to see which brain he's using.");
+  }
+}
+
+function brainProblem(text, { warning = false } = {}) {
+  const box = $("brain-problem");
+  if (!box) return;
+  box.textContent = text ?? "";
+  box.hidden = !text;
+  box.classList.toggle("warning", warning);
+}
+
+/** Buttons off while Anthropic is being asked, so nobody presses twice. */
+function brainBusy(busy, label) {
+  for (const id of ["brain-use", "brain-key-save", "brain-key-remove"]) {
+    const b = $(id);
+    if (b) b.disabled = busy;
+  }
+  if (busy && label) {
+    const note = $("brain-now");
+    if (note) note.textContent = label;
+  }
+}
+
+async function brainAction(body, busyLabel) {
+  brainProblem(null);
+  brainBusy(true, busyLabel);
+  try {
+    const res = await fetch("/api/brain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const result = await res.json();
+    if (result.state) paintBrain(result.state);
+    if (result.error) brainProblem(result.error);
+    else if (result.warning) brainProblem(result.warning, { warning: true });
+    return !result.error;
+  } catch {
+    brainProblem("Couldn't reach Greg to change that.");
+    if (brainNow) paintBrain(brainNow);
+    return false;
+  } finally {
+    brainBusy(false);
+    // Busy re-enabled every button; "Use this PC" while already on this PC
+    // must go back to being disabled.
+    if (brainNow) paintBrainButton();
+  }
+}
+
+const chosenBrain = () => document.querySelector('input[name="brain"]:checked')?.value ?? "local";
+
+function paintBrain(state) {
+  brainNow = state;
+  const active = state.active ?? {};
+  const modelName = (id) => state.models?.find((m) => m.id === id)?.label.split(" — ")[0] ?? id;
+
+  $("brain-now").textContent = !active.running
+    ? "He has no brain running right now, so he's in basic mode."
+    : state.using === "claude"
+    ? `He's thinking with ${modelName(state.model)}, on Anthropic's servers.`
+    : `He's thinking on this PC, with ${active.label}.`;
+
+  setRadio("brain", state.using);
+
+  const select = $("brain-model");
+  select.replaceChildren();
+  for (const model of state.models ?? []) {
+    const option = document.createElement("option");
+    option.value = model.id;
+    option.textContent = model.label;
+    select.append(option);
+  }
+  select.value = state.model;
+
+  $("brain-key-state").textContent = state.keySaved
+    ? `A key is saved${state.keyEnding ? `, ending ${state.keyEnding}` : ""}. Paste a new one to replace it.`
+    : "No key saved yet.";
+  $("brain-key-remove").hidden = !state.keySaved;
+  paintBrainButton();
+}
+
+/** The button says exactly what pressing it will do. */
+function paintBrainButton() {
+  const state = brainNow ?? {};
+  const want = chosenBrain();
+  const model = $("brain-model").value;
+  const button = $("brain-use");
+  $("brain-model").disabled = want !== "claude";
+  if (want === "local") {
+    button.textContent = "Use this PC";
+    button.disabled = state.using === "local";
+  } else if (state.using === "claude" && model !== state.model) {
+    button.textContent = "Change model";
+    button.disabled = false;
+  } else {
+    button.textContent = "Use Claude";
+    button.disabled = state.using === "claude";
+  }
+}
+
+async function useChosenBrain() {
+  const brain = chosenBrain();
+  const model = $("brain-model").value;
+  await brainAction(
+    { action: "use", brain, model },
+    brain === "claude" ? "Checking the key with Anthropic…" : "Switching to this PC…"
+  );
+}
+
+async function saveBrainKey() {
+  const input = $("brain-key");
+  const key = input.value.trim();
+  if (!key) return;
+  // Emptied before the answer comes back, not after: nothing on the page
+  // should hold it a moment longer than the request needs.
+  input.value = "";
+  await brainAction({ action: "save-key", key, model: $("brain-model").value }, "Checking the key with Anthropic…");
+}
+
+let removeArmed = null;
+async function removeBrainKey() {
+  const button = $("brain-key-remove");
+  // Two presses, like Delete in the Memory tab.
+  if (!removeArmed) {
+    button.textContent = "Sure?";
+    removeArmed = setTimeout(() => {
+      removeArmed = null;
+      button.textContent = "Remove key";
+    }, 4000);
+    return;
+  }
+  clearTimeout(removeArmed);
+  removeArmed = null;
+  button.textContent = "Remove key";
+  await brainAction({ action: "remove-key" }, "Removing the key…");
+}
+
+// ---------------------------------------------------------------------------
+// The Phone tab
+//
+// Acts at once, like Memory and Brain. It never sees a phone's token — only
+// names, dates and whether each wants notifications. The pairing code is shown
+// here because this is the only place one can be made.
+// ---------------------------------------------------------------------------
+
+let phoneNow = null;
+let phoneTick = null;
+
+async function loadPhone() {
+  phoneProblem(null);
+  try {
+    paintPhone(await (await fetch("/api/phone", { cache: "no-store" })).json());
+  } catch {
+    phoneProblem("Couldn't reach Greg to see the phone settings.");
+  }
+}
+
+function phoneProblem(text) {
+  const box = $("phone-problem");
+  if (!box) return;
+  box.textContent = text ?? "";
+  box.hidden = !text;
+}
+
+async function phoneAction(body) {
+  phoneProblem(null);
+  try {
+    const res = await fetch("/api/phone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const result = await res.json();
+    if (result.state) paintPhone(result.state);
+    if (result.error) phoneProblem(result.error);
+    return result;
+  } catch {
+    phoneProblem("Couldn't reach Greg to change that.");
+    return {};
+  }
+}
+
+function copyButton(text) {
+  const b = make("button", "btn", "Copy");
+  b.type = "button";
+  b.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      b.textContent = "Copied";
+      setTimeout(() => (b.textContent = "Copy"), 1500);
+    } catch {
+      b.textContent = "Select it";
+    }
+  });
+  return b;
+}
+
+/** A line of text to copy, as a read-only box and a button. */
+function copyRow(text) {
+  const row = make("div", "search-row");
+  const box = make("input");
+  box.type = "text";
+  box.readOnly = true;
+  box.value = text;
+  box.addEventListener("focus", () => box.select());
+  row.append(box, copyButton(text));
+  return row;
+}
+
+/** How the phone gets to this PC: what Tailscale says, and the next step. */
+function paintRoute(state) {
+  const route = $("phone-route");
+  route.replaceChildren();
+  const t = state.tailscale ?? {};
+  const say = (text) => route.append(make("p", "field-note", text));
+
+  if (!t.installed) {
+    say("Your phone reaches this PC through Tailscale, a free private network. Nothing is opened to the internet.");
+    say("1. Install Tailscale on this PC and on your phone, from tailscale.com/download, and sign in to the same account on both.");
+    say("2. Then run this once on this PC, in a terminal:");
+    route.append(copyRow(t.serveCommand ?? "tailscale serve --bg 4757"));
+    say("3. Come back here: the phone's address will show.");
+    return;
+  }
+  if (!t.running) {
+    say("Tailscale is installed but not connected. Open it from the system tray and sign in.");
+    return;
+  }
+  if (!t.serving) {
+    say("Tailscale is connected. One step left: run this once on this PC, in a terminal, to let your phone reach Greg's phone door:");
+    route.append(copyRow(t.serveCommand));
+    say("If Tailscale asks you to turn on HTTPS for your network, say yes — phones only allow the microphone over HTTPS.");
+    return;
+  }
+  say("Open this on your phone, then add it to the home screen:");
+  route.append(copyRow(t.address));
+  if (!state.listening) say("Greg's phone door isn't open yet. Tick “Let my phone reach Greg” above.");
+}
+
+function paintPhone(state) {
+  phoneNow = state;
+  $("phone-enabled").checked = state.enabled;
+  $("phone-keep").checked = state.keepRunning;
+  $("phone-keep").disabled = !state.enabled;
+  $("phone-keep-note").textContent = !state.launcher
+    ? "Only applies when he was started from Greg.exe. Started any other way, he runs until you close his console."
+    : "Otherwise he stops when his window closes, and the phone can't reach him. The PC must also be awake.";
+  $("phone-pair").disabled = !state.enabled;
+  paintRoute(state);
+
+  const list = $("phone-list");
+  list.replaceChildren();
+  if (!state.phones?.length) list.append(make("li", "mem-empty", "No phones paired yet."));
+  for (const phone of state.phones ?? []) {
+    const row = make("li");
+    const text = make("span", "mem-text", phone.name);
+    const seen = phone.lastSeen ? dayAndTime(Date.parse(phone.lastSeen)) : "never";
+    text.append(make("span", "mem-when", `Last used ${seen}. Reminders ${phone.notifications ? "on" : "off"}.`));
+    row.append(text, deleteButton(() => phoneAction({ action: "remove", id: phone.id }), "Remove"));
+    list.append(row);
+  }
+
+  clearInterval(phoneTick);
+  const pairing = $("phone-pairing");
+  if (state.pairing) {
+    pairing.hidden = false;
+    $("phone-code").textContent = state.pairing.code.replace(/(\d{3})(\d{3})/, "$1 $2");
+    const tick = () => {
+      const left = Math.max(0, state.pairing.expiresAt - Date.now());
+      if (!left) {
+        clearInterval(phoneTick);
+        loadPhone();
+        return;
+      }
+      $("phone-code-left").textContent = `Good for ${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, "0")} more.`;
+    };
+    tick();
+    phoneTick = setInterval(tick, 1000);
+  } else {
+    pairing.hidden = true;
+  }
 }
 
 function problem(text) {
@@ -527,7 +1107,7 @@ function collect() {
       style: $("set-style").value,
     },
     listening: {
-      followUpEnabled: $("set-followup").checked,
+      followUpMode: $("set-followup").value,
       followUpSeconds: Number($("set-followup-secs").value),
       bargeInEnabled: $("set-barge").checked,
       bargeInSustainMs: Number($("set-barge-ms").value),
@@ -535,6 +1115,7 @@ function collect() {
       floorMultiple: Number($("set-floor").value),
       deviceId: $("set-mic")?.value ?? "",
     },
+    pushToTalk: { key: $("set-talkkey").value },
   };
 }
 

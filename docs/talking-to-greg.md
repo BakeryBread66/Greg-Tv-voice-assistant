@@ -136,10 +136,17 @@ Four things stop it feeling like operating a machine.
 
 > "Hey Greg, what's the weather?" … *"Rain this afternoon, seventy-eight degrees."* … "do I need a jacket?"
 
+The same window lets in things you say to somebody else in the room, and he will answer those too. If that happens, **Settings → Listening → After he answers** has two stricter choices: keep listening only when his answer ended with a question, or never keep listening, so every question starts with his name.
+
+**Or press a key instead of saying his name.** Set a **talk key** in Settings → Listening — a function key like F9, or a letter with Ctrl or Alt held — and one press has him listening, the same as clicking his face. Pressed while he's talking, it stops him and listens. Started from **Greg.exe** it works whichever program you're in; started any other way, only while his window is in front, and the dialog says which you've got.
+
+**"Shut up", "stop", "never mind", "hold on"** — said on their own, with his name, or at the end of a sentence ("okay okay shut up Greg") — silence him instead of getting an answer.
+
 **Talking over him stops him.** He cuts off mid-sentence, stops generating the rest, and listens. No need to reach for the mouse — though clicking his face still works, and is the reliable option if barge-in isn't behaving.
 
 ```jsonc
-"followUp": { "enabled": true, "seconds": 7 },
+"followUp": { "mode": "always", "seconds": 7 },
+"pushToTalk": { "key": "Ctrl+Alt+G" },
 "bargeIn":  { "enabled": true, "sustainMs": 350 }
 ```
 
@@ -281,7 +288,7 @@ Two related habits, both automatic:
 
 ### Memory
 
-Anything Greg remembers about you lives in **`memory.json`** in the Greg folder — plain text you can read, edit, or delete yourself. It survives restarts. The ⟲ button clears the current *conversation*, not this. "Forget about my dog" removes only the facts that mention a dog; a request too vague to pick one out ("forget that") removes nothing, and he asks which you mean.
+Anything Greg remembers about you lives in **`memory.json`** in the Greg folder — plain text you can read, edit, or delete yourself. **Settings → Memory** shows all of it, with your reminders and timers, and lets you correct or delete any one of them, or add a fact he should know. It survives restarts. The ⟲ button clears the current *conversation*, not this. "Forget about my dog" removes only the facts that mention a dog; a request too vague to pick one out ("forget that") removes nothing, and he asks which you mean.
 
 Separately, he keeps a word-for-word log of every conversation in **`conversations.jsonl`**, which is what lets him answer "what did we talk about yesterday?". It keeps 90 days (`conversationLog.keepDays`). **"Clear our conversation history"** empties it and starts the current conversation fresh; he only does it when you ask in so many words, and if he ever answers that request without actually clearing it, he corrects himself out loud. The two are separate on purpose: wiping the log does not make him forget your dog's name, and forgetting the dog does not wipe the log.
 

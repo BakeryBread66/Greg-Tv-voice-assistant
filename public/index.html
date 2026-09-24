@@ -95,6 +95,9 @@
               <button class="tab" role="tab" data-tab="personality" aria-selected="false">Personality</button>
               <button class="tab" role="tab" data-tab="listening" aria-selected="false">Listening</button>
               <button class="tab" role="tab" data-tab="music" aria-selected="false">Music</button>
+              <button class="tab" role="tab" data-tab="memory" aria-selected="false">Memory</button>
+              <button class="tab" role="tab" data-tab="brain" aria-selected="false">Brain</button>
+              <button class="tab" role="tab" data-tab="phone" aria-selected="false">Phone</button>
             </div>
 
             <div class="dialog-body tab-body">
@@ -214,14 +217,27 @@
 
                 <hr class="rule" />
 
-                <label class="check">
-                  <input id="set-followup" type="checkbox" /> Keep listening after he answers
+                <label class="field">
+                  <span>After he answers</span>
+                  <select id="set-followup">
+                    <option value="always">Keep listening, so I can carry on without his name</option>
+                    <option value="question">Keep listening only when he asked me something</option>
+                    <option value="off">Stop listening until I say his name</option>
+                  </select>
                 </label>
                 <label class="field inline">
                   <span>for</span>
                   <input id="set-followup-secs" type="number" min="2" max="30" step="1" />
                   <span>seconds</span>
                 </label>
+                <p class="field-note">If he answers things you said to somebody else, choose one of the last two.</p>
+
+                <label class="field inline">
+                  <span>Talk key</span>
+                  <input id="set-talkkey" type="text" readonly spellcheck="false" placeholder="None" />
+                  <button id="set-talkkey-clear" class="btn" type="button">Clear</button>
+                </label>
+                <p id="set-talkkey-note" class="field-note"></p>
 
                 <label class="check">
                   <input id="set-barge" type="checkbox" /> Let me interrupt him by talking
@@ -266,6 +282,123 @@
                   Windows, not Spotify, so they need no account at all. Only naming
                   a particular song needs what is above.
                 </p>
+              </section>
+
+              <!--
+                What he knows about you. Unlike every other tab, a change here
+                happens when you make it: these are his records, not his settings,
+                and OK / Cancel / Apply would be a second copy of them that could
+                disagree. public/settings.js fills it from /api/memory.
+              -->
+              <section class="tab-page" data-page="memory" hidden>
+                <p class="field-note">
+                  Everything he remembers about you, and everything he has set to go off.
+                  Changes here are saved as you make them &mdash; Cancel does not undo them.
+                </p>
+
+                <fieldset class="group">
+                  <legend>What he remembers</legend>
+                  <ul id="mem-facts" class="results mem-list"></ul>
+                  <div class="search-row">
+                    <input id="mem-new" type="text" maxlength="300" spellcheck="false"
+                           placeholder="Something he should know about you" />
+                    <button id="mem-add" class="btn" type="button">Remember</button>
+                  </div>
+                </fieldset>
+
+                <fieldset class="group">
+                  <legend>Reminders and timers</legend>
+                  <ul id="mem-reminders" class="results mem-list"></ul>
+                </fieldset>
+
+                <p id="mem-problem" class="settings-problem" hidden></p>
+              </section>
+              <!--
+                Which brain he thinks with. Like Memory, it acts when you press
+                its own button rather than on OK / Apply: switching to Claude
+                checks the key with Anthropic first, which takes a moment and
+                can fail, and a dialog-wide Apply cannot say which part failed.
+                public/settings.js fills it from /api/brain. The key is never
+                sent back to this page, only whether one is saved.
+              -->
+              <section class="tab-page" data-page="brain" hidden>
+                <p id="brain-now" class="field-note"></p>
+
+                <fieldset class="group">
+                  <legend>Where he thinks</legend>
+                  <label class="radio block"><input type="radio" name="brain" value="local" /> On this PC &mdash; nothing you say leaves it</label>
+                  <label class="radio block"><input type="radio" name="brain" value="claude" /> Claude, on Anthropic's servers</label>
+                  <label class="field">
+                    <span>Claude model</span>
+                    <select id="brain-model"></select>
+                  </label>
+                </fieldset>
+
+                <fieldset class="group">
+                  <legend>Claude API key</legend>
+                  <p id="brain-key-state" class="field-note"></p>
+                  <div class="search-row">
+                    <input id="brain-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..." />
+                    <button id="brain-key-save" class="btn" type="button">Save key</button>
+                  </div>
+                  <button id="brain-key-remove" class="btn" type="button" hidden>Remove key</button>
+                  <p class="field-note">
+                    Make one at console.anthropic.com, under API keys. A Claude.ai subscription can't be
+                    used here: the API is billed separately, per question. It is checked before it is saved,
+                    and kept in the .env file in the Greg folder.
+                  </p>
+                </fieldset>
+
+                <p class="field-note">
+                  While Claude is his brain, everything you say to him goes to Anthropic to be answered,
+                  with what his tools find for you &mdash; the weather, searches, the text of files you ask
+                  him to read, what he says is on your screen &mdash; and the facts he remembers about you.
+                  The picture of your screen itself stays on this PC.
+                </p>
+
+                <div class="dialog-buttons brain-buttons">
+                  <button id="brain-use" class="btn" type="button">Switch</button>
+                </div>
+                <p id="brain-problem" class="settings-problem" hidden></p>
+              </section>
+              <!--
+                Reaching Greg from a phone. Acts on its own controls, at once,
+                like Memory and Brain. public/settings.js fills it from
+                /api/phone. Pairing codes are made here and only here, so a
+                phone can only be paired by somebody at this PC.
+              -->
+              <section class="tab-page" data-page="phone" hidden>
+                <label class="check">
+                  <input id="phone-enabled" type="checkbox" /> Let my phone reach Greg
+                </label>
+                <label class="check">
+                  <input id="phone-keep" type="checkbox" /> Keep him running when his window is closed
+                </label>
+                <p id="phone-keep-note" class="field-note"></p>
+
+                <fieldset class="group">
+                  <legend>Getting there</legend>
+                  <div id="phone-route"></div>
+                </fieldset>
+
+                <fieldset class="group">
+                  <legend>Paired phones</legend>
+                  <div id="phone-pairing" class="phone-pairing" hidden>
+                    <p class="field-note">On the phone, open the address above and type:</p>
+                    <p id="phone-code" class="phone-code"></p>
+                    <p id="phone-code-left" class="field-note"></p>
+                    <button id="phone-pair-cancel" class="btn" type="button">Cancel</button>
+                  </div>
+                  <ul id="phone-list" class="results mem-list"></ul>
+                  <button id="phone-pair" class="btn" type="button">Pair a phone</button>
+                </fieldset>
+
+                <p class="field-note">
+                  From a phone he can talk, play music, and set and check reminders &mdash; but he
+                  cannot see this PC's screen or read its files. Reminders pop up on phones that
+                  asked for them, sent encrypted through the phone's own notification service.
+                </p>
+                <p id="phone-problem" class="settings-problem" hidden></p>
               </section>
             </div>
 

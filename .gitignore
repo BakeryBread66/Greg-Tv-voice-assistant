@@ -83,3 +83,7 @@ Claude outputs/
 # CLAUDE.md's detail, split out of it: the same private engineering log, and
 # private for the same reason - it describes this machine.
 notes/
+
+# Paired phones: token hashes, notification subscriptions, and the key Greg signs
+# notifications with. Never published.
+phones.json

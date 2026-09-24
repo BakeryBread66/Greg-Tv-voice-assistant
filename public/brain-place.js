@@ -27,7 +27,7 @@ export function brainPlace(info = {}) {
   const service = String(info.brainService || (claude ? "Anthropic" : "another computer"));
   const who = claude ? "Greg is thinking with Claude, on Anthropic's servers" : `Greg's brain is running on ${service}`;
   const remedy = claude
-    ? 'To keep it all on this PC, set "provider" to "ollama" in config.json and restart him.'
+    ? 'To keep it all on this PC, choose "On this PC" in Settings, on the Brain tab.'
     : 'To keep it all on this PC, point "ollama.url" at this machine and use a model without a cloud tag.';
 
   return {
