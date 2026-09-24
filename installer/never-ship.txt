@@ -1,0 +1,38 @@
+# What must never be inside Greg-Setup.exe, as paths from Greg's folder. A name
+# ending in / is a folder and everything in it.
+#
+# installer\build.ps1 refuses to build a payload holding any of these, and
+# test/installer.test.js fails if git ever tracks one - the payload's source
+# files come from git's list, so a file git does not track cannot reach it.
+# Setup.cs relies on this: an update and the uninstaller only ever remove files
+# the payload had, so everything here is safe from both.
+#
+# Every entry is something Greg makes or is given on one machine, about one
+# person. Keep this in step with the "Secrets" and "Personal data" sections of
+# .gitignore.
+
+# Secrets
+.env
+spotify-tokens.json
+phones.json
+
+# Personal data
+config.json
+conversations.jsonl
+memory.json
+reminders.json
+personality.json
+screenshots/
+
+# Someone else's voice, and downloads that belong to their own projects
+voices/
+voice-audition/
+engines/
+cache/
+.venv/
+.venv-clone/
+
+# The private engineering log
+CLAUDE.md
+notes/
+Claude outputs/

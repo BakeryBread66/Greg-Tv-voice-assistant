@@ -96,3 +96,10 @@ engines/
 bench/speech/clips/
 bench/speech/results-*.json
 bench/speech/voice-*/
+
+# Greg-Setup.exe and what building it downloads and unpacks (installer/build.ps1).
+# The installer is published as a release file, never committed, for the same
+# reason Greg.exe is not.
+dist/
+installer/cache/
+installer/work/

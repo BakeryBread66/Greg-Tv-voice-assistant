@@ -35,8 +35,8 @@ it was here.
 
 macOS is in the same position and even less tested.
 
-**Node.js 20 or newer.** The only piece that is genuinely required. Everything
-else on this page is optional.
+**Node.js 20 or newer.** The only piece that is genuinely required, and
+`Greg-Setup.exe` brings its own. Everything else on this page is optional.
 
 **Chrome or Edge.** Edge ships with Windows, so you almost certainly already
 have one. Firefox works for most things but has no speech recognition of its
@@ -87,7 +87,31 @@ lend, and none of the four engines can target one.
 
 ## Setting him up
 
-**The simple way: start him.** On a first run that is missing something, Greg
+**The simplest way: `Greg-Setup.exe`.** One file. It puts Greg in
+`%LOCALAPPDATA%\Programs\Greg` with his own copy of Node.js, adds him to the Start
+menu (and the desktop, if you like) and to Settings → Apps, and needs no
+administrator rights. It downloads nothing. The first time Greg opens, the setup
+screen described next takes over.
+
+Running a newer `Greg-Setup.exe` updates him in place. Neither an update nor
+uninstalling from Settings → Apps touches your settings, memory, reminders,
+conversation log, voices or downloaded engines. The uninstaller deletes those
+only if you tick the box that names them.
+
+It is not code-signed, so the first time you run it, Windows SmartScreen says
+*Windows protected your PC*: choose **More info → Run anyway**. To build it
+yourself, which is also how to be sure what is in it, run this in a clone:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1
+```
+
+It writes `dist\Greg-Setup.exe` and its SHA-256, from Greg's committed files,
+`npm ci` and Node's official zip, checked against nodejs.org's published hash.
+`installer\check.ps1` then installs, updates and uninstalls it in a scratch
+folder and says what it verified.
+
+**From a clone: start him.** On a first run that is missing something, Greg
 opens a **Setting Greg up** screen in his own window. It says what your PC has —
 graphics card, Ollama — and lists what he still needs with the size of each:
 his brain (through Ollama), his hearing (whisper.cpp, the GPU or CPU build to

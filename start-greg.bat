@@ -2,6 +2,13 @@
 title Greg
 cd /d "%~dp0"
 
+REM An installed Greg (Greg-Setup.exe) carries his own Node, in runtime\.
+set "NODE=node"
+if exist "runtime\node.exe" (
+  set "NODE=%~dp0runtime\node.exe"
+  goto have_node
+)
+
 where node >nul 2>nul
 if errorlevel 1 (
   echo Node.js isn't installed or isn't on your PATH.
@@ -9,6 +16,7 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+:have_node
 
 if not exist "node_modules" (
   echo First run - installing Greg's dependencies. This takes about a minute...
@@ -32,5 +40,5 @@ if not exist "node_modules" (
   echo.
 )
 
-node server.js
+"%NODE%" server.js
 pause

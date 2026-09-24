@@ -137,6 +137,31 @@ closes every tab you have open. Stop Greg asks the server to shut down
 (`/api/quit`, which stops the sidecars itself), and only if that fails kills
 node and the sidecars by name — the same list `stop-greg.bat` matches.
 
+## 8. Greg-Setup.exe installs per user, and never touches what Greg made
+
+**Installing into Program Files** looks like the proper place. But Greg keeps
+his settings, memory and downloads beside his program files, and Program Files
+is not writable without an administrator — so either every start would need
+one, or his files would have to move and every path that finds them would
+change. `installer/Setup.cs` installs into `%LOCALAPPDATA%\Programs\Greg`
+instead, as VS Code's user installer does, and never asks for an administrator.
+
+**Replacing the whole folder on an update** looks tidier. It would also delete
+someone's memory. The installer writes `.greg-install`, the list of files it put
+there. An update removes only files on the old list that the new build no longer
+has, and the uninstaller removes only what the list names. What Greg makes is
+never on the list, because it can never be in the payload: `installer/build.ps1`
+packs from git's own list of files and refuses anything in
+`installer/never-ship.txt`, and `test/installer.test.js` fails if git ever
+tracks one of them. The uninstaller deletes your files only when you tick the
+box that names them.
+
+This is the one downloaded, unsigned program in the project, and SmartScreen
+will say so. That is the price of one file. It is still never committed: it is
+built from the repository by `installer/build.ps1`, with Windows' own compiler
+and Node's official zip checked against its published SHA-256, so anyone can
+build the same thing and compare.
+
 ---
 
 ## A known defect: the sentence gap overwrites Piper's own phrasing

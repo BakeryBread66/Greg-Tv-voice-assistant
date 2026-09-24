@@ -11,7 +11,8 @@
 // What it does, in order:
 //   1. If Greg is already running, bring his window forward and exit. Two
 //      servers cannot share the port, and two windows means two microphones.
-//   2. Find Node, and install the npm dependencies on the first run, exactly as
+//   2. Find Node - the one Greg-Setup put in runtime\, else the one on PATH -
+//      and install the npm dependencies on the first run, exactly as
 //      start-greg.bat does.
 //   3. Start "node server.js" with no console, keeping its output in memory so
 //      "Show console" can show the startup banner - the first thing to read
@@ -342,8 +343,15 @@ namespace Greg
             return null;
         }
 
-        public static string Node(string path)
+        /// <summary>
+        /// The Node.js Greg-Setup put beside him, if it did - so an installed
+        /// Greg runs on the Node he shipped with, whatever else is on the PC or
+        /// not - and otherwise the one on PATH.
+        /// </summary>
+        public static string Node(string root, string path)
         {
+            string bundled = Path.Combine(root, "runtime\\node.exe");
+            if (File.Exists(bundled)) return bundled;
             string found = OnPath("node.exe", path);
             if (found != null) return found;
             string standard = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs\\node.exe");
@@ -532,7 +540,7 @@ namespace Greg
 
         void StartUp()
         {
-            string node = Find.Node(path);
+            string node = Find.Node(root, path);
             if (node == null)
             {
                 OnUi(delegate
