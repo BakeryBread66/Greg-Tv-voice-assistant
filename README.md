@@ -87,7 +87,9 @@ lend, and none of the four engines can target one.
 
 ## Setting him up
 
-**The simplest way: `Greg-Setup.exe`.** One file. It puts Greg in
+**The simplest way: `Greg-Setup.exe`**, from the
+[latest release](https://github.com/BakeryBread66/Greg-Tv-voice-assistant/releases/latest).
+One file. It puts Greg in
 `%LOCALAPPDATA%\Programs\Greg` with his own copy of Node.js, adds him to the Start
 menu (and the desktop, if you like) and to Settings → Apps, and needs no
 administrator rights. It downloads nothing. The first time Greg opens, the setup
