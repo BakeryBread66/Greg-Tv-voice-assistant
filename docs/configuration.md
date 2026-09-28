@@ -6,6 +6,15 @@ Every setting, where it lives, and which ones need a restart.
 
 ---
 
+## Where settings live
+
+On the first run he creates `config.json` from `config.example.json` and says so on
+the console — that's where his name, your location, his voice and everything else
+live. Nothing in it is required to get started; he detects your city on his own and
+picks the best brain, ears and voice he can find on your machine. `config.json` is
+yours and is never published: it's gitignored, because it ends up holding your
+coordinates. Most of it can also be changed from **Settings** in his window.
+
 ## How the brain works
 
 Greg's conversation runs on **Ollama**, which hosts a language model locally on your GPU. It's already installed and configured. Greg picks a brain automatically at startup:

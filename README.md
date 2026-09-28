@@ -1,266 +1,77 @@
 # Greg
 
-A local AI buddy with a face, a voice, and ears. Say **"Hey Greg"** and he answers out loud.
+A voice assistant with the face of an old television, running on your own PC.
+Say **"Hey Greg"** and he answers out loud.
 
 ![Greg: a floating television with antennae showing SMPTE colour bars and a PLEASE STAND BY caption, bobbing gently against a solid background](docs/greg-floating.gif)
 
-*Idling on channel 1. He drifts like that the whole time he is waiting, and the
-picture reacts to your voice and to his own.*
+- **Hears you** — always listening for his name, no button to press
+- **Talks back** — in a natural voice, and you can talk over him to stop him
+- **Knows your weather and local news** — for wherever you are
+- **Holds a conversation** — a real language model, on your own PC
+- **Comes with you** — talk to him from your phone and get reminders as notifications ([how](docs/phone.md))
 
-- **Hears you** — always listening for the wake word, no button press
-- **Talks back** — a natural neural voice, not a robot, and he starts before he's finished writing
-- **Lets you cut in** — talk over him to stop him, and ask a follow-up without saying his name again
-- **Knows your weather** — real conditions and forecast for wherever you are
-- **Reads your local news** — headlines from your actual city
-- **Holds a conversation** — a real language model, running on your own PC
-- **Has a face** — a floating TV head whose picture reacts to your voice and his own
-- **Comes with you** — talk to him from your phone, anywhere, and get your reminders as notifications ([how](docs/phone.md))
+**No account, no subscription, no API key.** His brain, ears and voice all run
+on your PC, so what you say stays there — unless you choose Claude as his brain
+in Settings. Unplug the internet and he still
+talks; he just can't fetch the weather or the news. If anything falls back to a
+cloud service, his startup screen says so in amber.
 
-**No API key. No account. No subscription.** His brain, his ears *and* his voice all run entirely on your own machine. Nothing you say — and nothing he says — is sent anywhere. Unplug the internet and he still talks to you; he just can't look up the weather or the news.
+## Install
 
----
+For Windows 10 or 11.
 
-## What you need
+1. Download **`Greg-Setup.exe`** from the [latest release](https://github.com/BakeryBread66/Greg-Tv-voice-assistant/releases/latest).
+2. Run it. It isn't code-signed, so Windows may say *Windows protected your PC*:
+   choose **More info → Run anyway**. It needs no administrator rights.
+3. When Greg opens, his setup screen lists what he still needs — his brain,
+   hearing and voice, about 10 GB, mostly the brain — and downloads it when you
+   press **Install**.
 
-**Windows 10 or 11**, where everything works and everything has been used.
+To update, run a newer `Greg-Setup.exe`. To remove him, use Settings → Apps.
+Updating never touches your settings, memory or conversations, and removing him
+deletes them only if you tick the box that says so.
 
-**Linux boots too**, with five Windows-only features off — screen vision, cursor
-tracking, now playing, media keys and the system voice. The brain, the ears, the
-voice, all fourteen channels and every tool but two work unchanged, and he names
-what is missing in the startup banner rather than letting you find out when
-something quietly does nothing. Run `./setup-greg.sh` then `./start-greg.sh`.
-**Nobody has run him on a Linux desktop yet** — see [docs/linux.md](docs/linux.md),
-including what each missing piece would take, most of which is easier there than
-it was here.
+Linux, installing from a clone, the cloned voice and doing it all by hand are in
+[docs/install.md](docs/install.md).
 
-macOS is in the same position and even less tested.
+## What your PC needs
 
-**Node.js 20 or newer.** The only piece that is genuinely required, and
-`Greg-Setup.exe` brings its own. Everything else on this page is optional.
+- **Chrome or Edge.** Edge comes with Windows.
+- **About 10 GB of disk** for his brain, 16 GB if he should also see your screen.
+- **A graphics card is optional.** With an NVIDIA card, about 6 GB of video
+  memory runs him comfortably and 12 GB adds screen vision. On 8 GB, use
+  [Mini Greg](docs/mini.md).
 
-**Chrome or Edge.** Edge ships with Windows, so you almost certainly already
-have one. Firefox works for most things but has no speech recognition of its
-own, so you would need the offline ears below.
+## Using him
 
-**Disk space, only if you want him local.** Nothing extra to run him at all;
-about 10 GB for a brain on your own machine, around 16 GB for everything
-including his eyes.
-
-**An NVIDIA card is optional.** Hearing works on the CPU and is perfectly
-usable. A card mainly buys you fast screen vision and the cloned voice.
-
-Measured, resident, on a 24 GB card:
-
-| | |
-| --- | ---: |
-| Brain (`gemma4:e4b`) | 3.4 GB |
-| Ears (Whisper) | ~1 GB, or none on the CPU |
-| Eyes (`qwen2.5vl:7b`) | 5.9 GB |
-| Cloned voice | **2.8 GB** |
-
-**Those are Ollama's figures, and your card loses more than that.** Ollama's
-`size_vram` counts weights and the KV cache; the driver also sees the CUDA
-context and compute buffers, and the gap is not small — `gemma4:e4b` reports
-3418 MB and costs **5141 MiB** of the card. If you are budgeting a machine
-rather than reading a comparison, use the driver-level table in
-[docs/mini.md](docs/mini.md).
-
-So **~6 GB** runs the brain and ears comfortably, **~12 GB** adds the eyes, and
-**~16 GB** holds all four at once.
-
-**On 8 GB, run [Mini Greg](docs/mini.md).** It is the same Greg with the eyes off
-and the cloned voice in half precision — which is measured at 2826 MiB against
-the 3801 it used to take, for no audible difference and no speed cost. The voice
-stays; it is the point.
-
-```
-setup-greg.ps1 -SmallCard
-```
-
-Screenshots still work without the eyes, because saving a picture needs no model
-— only interpreting one does.
-
-Running the clone itself on the CPU (`clonedVoice.device`) works and is too slow
-to talk to — measured at **3.7x realtime**, about twelve seconds before he starts
-a one-sentence reply. An NPU does not help either: it has no memory of its own to
-lend, and none of the four engines can target one.
-
-## Setting him up
-
-**The simplest way: `Greg-Setup.exe`**, from the
-[latest release](https://github.com/BakeryBread66/Greg-Tv-voice-assistant/releases/latest).
-One file. It puts Greg in
-`%LOCALAPPDATA%\Programs\Greg` with his own copy of Node.js, adds him to the Start
-menu (and the desktop, if you like) and to Settings → Apps, and needs no
-administrator rights. It downloads nothing. The first time Greg opens, the setup
-screen described next takes over.
-
-Running a newer `Greg-Setup.exe` updates him in place. Neither an update nor
-uninstalling from Settings → Apps touches your settings, memory, reminders,
-conversation log, voices or downloaded engines. The uninstaller deletes those
-only if you tick the box that names them.
-
-It is not code-signed, so the first time you run it, Windows SmartScreen says
-*Windows protected your PC*: choose **More info → Run anyway**. To build it
-yourself, which is also how to be sure what is in it, run this in a clone:
-
-```
-powershell -NoProfile -ExecutionPolicy Bypass -File installer\build.ps1
-```
-
-It writes `dist\Greg-Setup.exe` and its SHA-256, from Greg's committed files,
-`npm ci` and Node's official zip, checked against nodejs.org's published hash.
-`installer\check.ps1` then installs, updates and uninstalls it in a scratch
-folder and says what it verified.
-
-**From a clone: start him.** On a first run that is missing something, Greg
-opens a **Setting Greg up** screen in his own window. It says what your PC has —
-graphics card, Ollama — and lists what he still needs with the size of each:
-his brain (through Ollama), his hearing (whisper.cpp, the GPU or CPU build to
-suit your card), and his voice. Press **Install** and watch the progress bars;
-when it finishes he is using them, no restart. Every file is checked against its
-publisher's SHA-256 before it is used, and **none of it needs Python**. Settings →
-General → *Check what's installed…* opens the same screen any time.
-
-It needs Node.js already, and installs Ollama with winget if it isn't there.
-The one thing it cannot do is the cloned voice, which still needs Python — see
-below.
-
-**The detailed way:** double-click **`setup-greg.bat`**. It looks at what your machine already has,
-asks which pieces you want with the download size next to each, installs them,
-and then tells you honestly what worked.
-
-Want to see what it would do without it doing anything? Open a terminal here and
-run:
-
-```bash
-powershell -NoProfile -ExecutionPolicy Bypass -File setup-greg.ps1 -DryRun
-```
-
-**None of it is required.** Greg is built to degrade rather than fail: with
-nothing but Node.js he still runs, still holds a conversation, still shows you
-the weather — he just borrows a cloud voice and the browser's own speech
-recognition to do it, and his startup screen says so in amber rather than
-pretending. Everything below is about taking pieces off other people's servers
-and putting them on your machine.
-
-| What | You get | Download |
-|---|---|---|
-| **Node.js 20+** | Greg runs at all. The only thing that isn't optional. | 30 MB |
-| **Ollama + `gemma4:e4b`** | A real brain, on your own machine. | 9.6 GB |
-| **Python 3 + `faster-whisper`** | He hears you offline. | 200 MB |
-| **`piper-tts`** | He speaks offline. Voices download themselves on first use. | 100 MB |
-| **`qwen2.5vl:7b`** | He can look at your screen. | 5.9 GB |
-| **CUDA runtime packages** | The ears run on your NVIDIA card instead of the CPU. Offered only if you have one. | 1 GB |
-
-The setup script drives [winget](https://learn.microsoft.com/windows/package-manager/),
-which ships with Windows 11 and recent Windows 10. Without it the script still
-runs and still tells you what's missing — it just prints the download links
-instead of fetching anything.
-
-### Doing it by hand
-
-If the script fails on a step, or you'd rather do it yourself:
-
-```bash
-winget install --id OpenJS.NodeJS.LTS --exact
-winget install --id Ollama.Ollama --exact
-winget install --id Python.Python.3.12 --exact
-```
-
-Then, in a **new** terminal — freshly installed programs aren't on the old one's
-PATH:
-
-```bash
-ollama pull gemma4:e4b
-py -3 -m pip install faster-whisper piper-tts
-```
-
-And if you have an NVIDIA card and want the ears on it:
-
-```bash
-py -3 -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 nvidia-cuda-runtime-cu12
-```
-
-### The cloned voice is the one thing setup can't finish
-
-Greg can speak in a cloned voice, and the setup script will install the machinery
-for it with `-Clone`. It cannot finish the job, and it says so rather than
-appearing to succeed: cloning needs about ten seconds of a real person's
-recording saved as `voices/greg-reference.wav`, and nothing ships one — that
-would mean publishing somebody's voice. Record your own, or leave it off and keep
-Piper.
-
-It also needs **Python 3.12 exactly**, because `torch==2.6.0` has no wheels for
-anything newer, and the `py` launcher often can't see a 3.12 even when one is
-installed. Both are checked before anything is downloaded.
-
-## Start him up
-
-Open **Greg** from the Start menu or your desktop — the setup puts him in both.
-He starts with no console window, a little television appears in the tray, and a
-window opens with Greg's face.
-
-No shortcut? Greg.exe is built by the setup rather than downloaded, so an install
-from before it existed does not have one yet. Double-click `setup-greg.bat` again —
-it skips anything already installed and builds Greg.exe at the end, with the
-compiler that is part of Windows. From a terminal in the Greg folder,
-`setup-greg.bat -Launcher` does only that part, with no questions and no
-downloads. **`start-greg.bat`** still works too, and is the one to reach for when
-something is wrong, because it shows his console as he runs.
-
-When the window opens, click **Wake Greg**, allow microphone access when the browser asks, and say:
+Open **Greg** from the Start menu. A little television appears in the tray and
+his window opens. Click **Wake Greg**, allow the microphone, and say:
 
 > "Hey Greg, what's the weather?"
 
 ![The Greg window: the floating television inside a Windows 98 frame, with a row of control buttons along the bottom, a type-here box, and a status line reading "Say Hey Greg — listening offline on this machine"](docs/greg.png)
 
-*The whole window. The clock on the test card is his uptime, the row of buttons is
-everything he can be told to do with a mouse, and the line underneath says which
-ears he is actually using.*
+To stop him, close his window: he shuts down about fifteen seconds later. **Stop
+Greg** in the tray menu does it straight away.
 
-The set warms up first — the tube strikes, a startup screen counts the memory and
-lists what actually loaded, and a Windows 98 splash comes up. About four seconds,
-and you can click straight through it. Everything on that screen is real: if your
-ears or voice fell back to a cloud service, it says so in amber rather than
-pretending. Add `?boot=0` to the address to skip it for good.
+Nothing needs setting up. He finds your city on his own, and his settings live
+in `config.json` and in **Settings** in his window.
 
-**First time?** Nothing to do. On the first run he creates `config.json` from
-`config.example.json` and says so on the console — that's where his name, your
-location, his voice and everything else live. Nothing in it is required to get
-started; he detects your city on his own and picks the best brain, ears and voice
-he can find on your machine. `config.json` is yours and is never published: it's
-gitignored, because it ends up holding your coordinates.
-
-## Shut him down
-
-**Close his window.** Started from Greg.exe, he notices his window has gone and
-shuts down about fifteen seconds later — long enough that reloading the page
-does not count — and gives the graphics card back. **Stop Greg** in the tray
-icon's menu does the same straight away, and **Show console** there shows
-everything start-greg.bat's window used to, startup banner included. It is kept
-in memory only, so nothing he heard is written to disk.
-
-Started from `start-greg.bat`, double-click **`stop-greg.bat`**. It tells you whether he was running and confirms when he's off.
-
-## The rest of it
-
-There is a lot more than the list at the top: fourteen channels, screen vision
-that refuses to pretend, music that ducks under his voice, personas he can
-become on request, and files he can read but never write. It lives in five
-pages rather than on this one, so this page stays readable:
+## More
 
 - **[His face and his channels](docs/channels.md)** — the television, all fourteen channels, the Global Dashboard
 - **[Talking to Greg](docs/talking-to-greg.md)** — how a conversation flows, things to say, personality and personas
 - **[What else he can do](docs/features.md)** — screen vision, music, files, subtitles, volume
 - **[Giving him a different voice](docs/voices.md)** — cloning somebody from ten seconds of recording, and the Piper voices
 - **[Greg on your phone](docs/phone.md)** — talking to him from anywhere, and reminders as notifications
+- **[Installing in detail](docs/install.md)** — Linux, from a clone, by hand, and hardware
 - **[Configuration](docs/configuration.md)** — every setting, and which need a restart
 - **[Troubleshooting](docs/troubleshooting.md)** — when something is not working
 
-And **[DECISIONS.md](DECISIONS.md)** records the settings that look like obvious
-improvements and are not, each with the measurement that settled it. Read that
-one before changing anything in `config.json` you think is wasteful.
+**[DECISIONS.md](DECISIONS.md)** records the settings that look like obvious
+improvements and are not, each with the measurement that settled it. Read it
+before changing anything you think is wasteful.
 
 ## Credits
 
@@ -275,26 +86,33 @@ That covers the code in this repository and nothing else. Greg is mostly a
 conductor for other people's work, and the pieces that do the heavy lifting are
 separate projects under their own terms:
 
-**Installed by `npm install`, and served to the browser from `node_modules`.**
-Verified MIT at the versions pinned in `package-lock.json`:
+**Installed by `npm install`.**
 [three.js](https://github.com/mrdoob/three.js),
 [globe.gl](https://github.com/vasturiano/globe.gl),
 [three-globe](https://github.com/vasturiano/three-globe) and the
-[Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript). The
-country outlines the dashboard draws come from
+[Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript) are MIT,
+and [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), which speaks his voice,
+is Apache-2.0, at the versions pinned in `package-lock.json`. The country
+outlines the dashboard draws come from
 [Natural Earth](https://www.naturalearthdata.com/), which is public domain.
 
-**Installed with `pip`, and run as sidecar processes.** Not vendored here, and
-each carries its own licence — check them before you redistribute anything built
-on top: [faster-whisper](https://github.com/SYSTRAN/faster-whisper) for the ears,
-[Piper](https://github.com/OHF-Voice/piper1-gpl) for the local voice,
-[Chatterbox](https://github.com/resemble-ai/chatterbox) for the cloned one, and
-[PyTorch](https://pytorch.org/) underneath it.
+**Bundled in `Greg-Setup.exe`:** [Node.js](https://nodejs.org/), MIT, with its
+licence beside it in `runtime\LICENSE`.
 
-**Voice models are their own thing again.** Piper downloads its voices on first
-use and they are licensed individually by whoever recorded them; a Chatterbox
-clone is only ever as licensed as the recording you point it at. Neither ships in
-this repo, which is why `voices/` is gitignored.
+**Downloaded by the setup screen:** [whisper.cpp](https://github.com/ggml-org/whisper.cpp)
+for his hearing (MIT), its models, the pronunciation data for his voice, and a
+Piper voice. Each carries its own licence.
+
+**Optional, installed with `pip`:** [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+and [Piper](https://github.com/OHF-Voice/piper1-gpl), the older Python ears and
+voice, and [Chatterbox](https://github.com/resemble-ai/chatterbox) with
+[PyTorch](https://pytorch.org/) for the cloned voice. Check each licence before
+you redistribute anything built on top.
+
+**Voice models are their own thing again.** Piper voices are licensed
+individually by whoever recorded them, and a Chatterbox clone is only ever as
+licensed as the recording you point it at. Neither ships in this repo, which is
+why `voices/` is gitignored.
 
 **The data feeds are free and keyless, and none of them are ours.** NWS/NOAA and
 USGS are US government work in the public domain; Open-Meteo, Google News RSS,

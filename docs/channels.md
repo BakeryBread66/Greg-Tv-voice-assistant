@@ -95,6 +95,18 @@ It repaints as you choose, before you press anything, because picking a colour
 you cannot see yet is not picking a colour. Cancel puts it back.
 
 
+## Switching on
+
+The set warms up first — the tube strikes, a startup screen counts the memory and
+lists what actually loaded, and a Windows 98 splash comes up. About four seconds,
+and you can click straight through it. Everything on that screen is real: if his
+ears or voice fell back to a cloud service, it says so in amber rather than
+pretending. Add `?boot=0` to the address to skip it for good.
+
+In the window itself, the clock on the test card is his uptime, the row of
+buttons is everything he can be told to do with a mouse, and the line underneath
+says which ears he is actually using.
+
 ## His face
 
 Greg is a floating CRT television. The cabinet is aged beige plastic with rabbit
